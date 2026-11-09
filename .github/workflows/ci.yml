@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Lua syntax, the tests on a fake WoW client, and the TOC.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lua 5.1
+        run: sudo apt-get install -y lua5.1 > /dev/null
+
+      - name: Lua syntax
+        run: for f in Gulli-QuestCleaner/*.lua tests/*.lua; do luac5.1 -p "$f"; done
+
+      - name: Tests on a fake WoW client
+        run: lua5.1 tests/test.lua
+
+      - name: TOC lists every Lua file and a Forever interface
+        run: |
+          toc=Gulli-QuestCleaner/Gulli-QuestCleaner.toc
+          grep -q '^## Interface: 160' "$toc" || { echo "::error::$toc has no ## Interface: 160xx"; exit 1; }
+          grep -qE '^## Version: [0-9]+\.[0-9]+\.[0-9]+' "$toc" || { echo "::error::$toc has no ## Version: x.y.z"; exit 1; }
+          for f in Gulli-QuestCleaner/*.lua; do
+            grep -qx "$(basename "$f")" "$toc" || { echo "::error::$f is not listed in $toc"; exit 1; }
+          done
+
+  # Branch names follow AGENTS.md: feature/<name> or bugfix/<name>.
+  branch-name:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Branch name follows AGENTS.md
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" == dependabot/* ]]; then exit 0; fi
+          if [[ ! "$HEAD_REF" =~ ^(feature|bugfix)/[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            echo "::error::Branch '$HEAD_REF' must be feature/<name> or bugfix/<name> (lowercase words joined by hyphens). See AGENTS.md."
+            exit 1
+          fi
+          case "$HEAD_REF" in
+            */patch|*/update|*/project-thread) echo "::error::Branch '$HEAD_REF' has a generic name. Name the task."; exit 1 ;;
+          esac

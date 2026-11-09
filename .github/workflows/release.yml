@@ -1,34 +1,68 @@
 name: Release
+
+# Zip the addon and publish GitHub Release v<version> with a release.json for the
+# "forever" flavor, so Runeloader and its index find the Forever build. The version
+# comes from "## Version" in the TOC. Start it with "Run workflow" on main (it tags the
+# commit it built) or by pushing the tag v<version>.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release and its tag
+    env:
+      EVENT: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Check Lua syntax
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lua 5.1
+        run: sudo apt-get install -y lua5.1 > /dev/null
+
+      - name: Tests
         run: |
-          sudo apt-get install -y lua5.1 >/dev/null
-          for f in Gulli-QuestCleaner/*.lua; do luac5.1 -p "$f"; done
-      - name: Read version
+          for f in Gulli-QuestCleaner/*.lua tests/*.lua; do luac5.1 -p "$f"; done
+          lua5.1 tests/test.lua
+
+      - name: Version from the TOC
         run: |
           v=$(sed -n 's/^## Version: *//p' Gulli-QuestCleaner/Gulli-QuestCleaner.toc | tr -d '\r')
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match TOC version $v"; exit 1
+          echo "TOC version: $v, ref: $REF_NAME ($EVENT)"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$REF_NAME" != "main" ]; then
+              echo "::error::Run the release workflow on main, not $REF_NAME."; exit 1
+            fi
+          elif [ "$REF_NAME" != "v$v" ]; then
+            echo "::error::Tag $REF_NAME does not match ## Version $v. Tag the release v$v."; exit 1
           fi
           echo "VERSION=$v" >> "$GITHUB_ENV"
+
       - name: Package
         run: |
           zip -r "Gulli-QuestCleaner-$VERSION-forever.zip" Gulli-QuestCleaner
           printf '{"releases":[{"name":"Gulli-QuestCleaner","version":"%s","filename":"Gulli-QuestCleaner-%s-forever.zip","nolib":false,"metadata":[{"flavor":"forever","interface":16001}]}]}\n' "$VERSION" "$VERSION" > release.json
           cat release.json
+
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
+          if gh release view "v$VERSION" --repo "$REPO" > /dev/null 2>&1; then
+            echo "::error::Release v$VERSION already exists. Bump ## Version in the TOC."; exit 1
+          fi
           gh release create "v$VERSION" "Gulli-QuestCleaner-$VERSION-forever.zip" release.json \
-            --target "$GITHUB_SHA" --title "Gulli-QuestCleaner $VERSION" --generate-notes
+            --repo "$REPO" --target "$GITHUB_SHA" --title "Gulli-QuestCleaner $VERSION" --generate-notes
