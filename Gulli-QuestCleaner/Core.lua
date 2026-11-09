@@ -61,13 +61,18 @@ local function entry(index)
     return title, level, isHeader, false, questID
 end
 
--- Every quest in the log: { questID, title, level, index }.
+-- Every quest in the log: { questID, title, level, index, zone, zoneOrder }. The zone is
+-- the quest log header above the quest (in Vanilla content, the zone or a category).
 function ns.Quests()
     local out = {}
+    local zone, zoneOrder = nil, 0
     for i = 1, numEntries() do
         local title, level, isHeader, isHidden, questID = entry(i)
-        if title and not isHeader and not isHidden and questID and questID > 0 then
-            out[#out + 1] = { questID = questID, title = title, level = level or 0, index = i }
+        if isHeader then
+            zone, zoneOrder = title, zoneOrder + 1
+        elseif title and not isHidden and questID and questID > 0 then
+            out[#out + 1] = { questID = questID, title = title, level = level or 0, index = i,
+                              zone = zone or "", zoneOrder = zoneOrder }
         end
     end
     return out
@@ -193,10 +198,27 @@ function ns.PlanQuests(maxLevel)
             out[#out + 1] = q
         end
     end
+    -- Zones in quest log order, then by level inside a zone.
     table.sort(out, function(a, b)
+        if a.zoneOrder ~= b.zoneOrder then return a.zoneOrder < b.zoneOrder end
         if a.level ~= b.level then return a.level < b.level end
         return a.title < b.title
     end)
+    return out
+end
+
+-- The planned quests grouped by zone, in plan order: { { name, quests = {...} }, ... }.
+function ns.Zones(planned)
+    local out, byName = {}, {}
+    for _, q in ipairs(planned or {}) do
+        local z = byName[q.zone]
+        if not z then
+            z = { name = q.zone, quests = {} }
+            byName[q.zone] = z
+            out[#out + 1] = z
+        end
+        z.quests[#z.quests + 1] = q
+    end
     return out
 end
 
@@ -339,7 +361,6 @@ f:SetScript("OnEvent", function(_, _, name)
     local d = db()
     if d.quests == nil then d.quests = true end
     if d.items == nil then d.items = true end
-    ns.SetLanguage(d.lang)
 end)
 
 SLASH_GULLIQUESTCLEANER1 = "/gqc"

@@ -117,28 +117,52 @@ test("the window: Clear, then OK, cleans and reports", function()
     local ns = Load()
     ns.Toggle()
     Find(function(f) return rawget(f, "_OnShow") end)._OnShow()
-    Find(function(f) return rawget(f, "_text") == ns.L.CLEAR and rawget(f, "_OnClick") end)._OnClick()
-    Find(function(f) return rawget(f, "_text") == ns.L.OK and rawget(f, "_OnClick") end)._OnClick()
+    Find(function(f) return TextOf(f) == ns.L.CLEAR and rawget(f, "_OnClick") end)._OnClick()
+    Find(function(f) return TextOf(f) == ns.L.OK and rawget(f, "_OnClick") end)._OnClick()
     eq(w.abandoned[101] and w.abandoned[102], true, "abandoned")
     eq(w.printed[#w.printed]:find("2 quests abandoned", 1, true) ~= nil, true, "done message: " .. tostring(w.printed[#w.printed]))
 end)
 
-test("language: client language by default, the picker overrides, System goes back", function()
-    Fake { quests = QUESTS, bag = bag(), locale = "ruRU" }
-    local ns = Load()
-    eq(ns.L.CLEAR, "Очистить")
-    ns.Toggle()
-    Find(function(f) return rawget(f, "tag") == "de" end)._OnClick()
-    eq(ns.L.CLEAR, "Aufräumen")
-    eq(GulliQuestCleanerDB.lang, "de", "saved language")
-    Find(function(f) return rawget(f, "tag") == "" end)._OnClick()
-    eq(ns.L.CLEAR, "Очистить")
+test("the addon speaks the client's language and falls back to English", function()
+    Fake { locale = "ruRU" }
+    eq(Load().L.CLEAR, "Очистить")
+    Fake { locale = "deDE" }
+    eq(Load().L.CLEAR, "Aufräumen")
+    Fake { locale = "koKR" }
+    eq(Load().L.CLEAR, "Clear")
 end)
 
-test("a saved language is used after a reload", function()
-    Fake { quests = QUESTS, bag = bag(), locale = "enUS", db = { lang = "fr" } }
+test("quests keep their zone and the plan is grouped by zone in log order", function()
+    Fake { quests = {
+        { title = "Westfall", isHeader = true },
+        { title = "Stew", level = 14, questID = 1 },
+        { title = "Elwynn Forest", isHeader = true },
+        { title = "Wolves", level = 6, questID = 2 },
+        { title = "Kobolds", level = 4, questID = 3 },
+        { title = "Westfall", isHeader = true },
+        { title = "Murlocs", level = 12, questID = 4 },
+    } }
     local ns = Load()
-    eq(ns.L.CLEAR, "Nettoyer")
+    local zones = ns.Zones(ns.PlanQuests(20))
+    eq(#zones, 2, "zones")
+    eq(zones[1].name, "Westfall")
+    eq(names(zones[1].quests), "Murlocs,Stew", "Westfall quests")
+    eq(zones[2].name, "Elwynn Forest")
+    eq(zones[2].quests[1].title, "Kobolds", "lower level first")
+end)
+
+test("a zone row ticks and unticks all of its quests", function()
+    Fake { quests = QUESTS, bag = bag(), level = 18 }
+    local ns = Load()
+    ns.Toggle()
+    Find(function(f) return rawget(f, "_OnShow") end)._OnShow()
+    Find(function(f) return TextOf(f) == ns.L.CLEAR and rawget(f, "_OnClick") end)._OnClick()
+    local zoneRow = Find(function(f) local d = rawget(f, "data"); return d and d.quests end)
+    assert(zoneRow, "no zone row")
+    zoneRow._OnClick()
+    for _, q in ipairs(rawget(zoneRow, "data").quests) do eq(q.checked, false, q.title .. " after one click") end
+    zoneRow._OnClick()
+    for _, q in ipairs(rawget(zoneRow, "data").quests) do eq(q.checked, true, q.title .. " after two clicks") end
 end)
 
 test("every language has every key, with the same %d placeholders", function()
@@ -146,10 +170,9 @@ test("every language has every key, with the same %d placeholders", function()
     local ns = Load()
     local en = ns.T.en
     for i, tag in ipairs(ns.TAGS) do
-        if tag ~= "" then
+        do
             local t = ns.T[tag]
             assert(t, "no table for " .. tag)
-            assert(ns.NAMES[i], "no name for " .. tag)
             for key, text in pairs(en) do
                 assert(t[key], tag .. " is missing " .. key)
                 local _, a = text:gsub("%%d", "")

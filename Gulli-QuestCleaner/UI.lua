@@ -1,27 +1,28 @@
 local _, ns = ...
 local L = ns.L
+local S = ns.Skin
 
--- Preview: quests on the left, items on the right, a line from each quest to the
--- items it needs. Items no quest needs hang off a "no quest" label at the end.
-local W = 660
-local SETUP_H, PREVIEW_H = 200, 480
-local ROW_H = 32
-local LEFT_W, GAP = 250, 56
-local GOLD = { 1, 0.82, 0, 0.85 }
-local DIM = { 0.55, 0.55, 0.55, 0.35 }
-local GREY = "|cff9d9d9d"
+-- Two views in one window. Setup: the level and what to clean. Preview: zones
+-- and their quests on the left, items on the right, a line from each quest to the items
+-- it needs. Items no quest needs hang off a "No quest" label at the end.
+local W = 680
+local SETUP_H, PREVIEW_H = 214, 520
+local TITLE_H = 28
+local ROW_H, ZONE_H = 32, 28
+local LEFT_W, GAP = 262, 52
+local DIM = { 0.55, 0.55, 0.58, 0.35 }
 
 local frame, setup, preview, status, summary
 local edit, checkQuests, checkItems
-local scroll, content, okButton, backButton, questHead, itemHead, langButton, langMenu
+local scroll, content, okButton, backButton, questHead, itemHead
 local plan = { quests = {}, items = {} }
 local totals = { quests = 0, items = 0 }
-local pools = { quest = {}, item = {}, label = {}, line = {}, band = {} }
+local pools = { zone = {}, quest = {}, item = {}, label = {}, line = {}, band = {} }
 local used = {}
 
 local function setStatus(text) status:SetText(text or "") end
 
--- Fixed labels, set again when the player picks another language.
+-- Fixed labels by key, set once the window is built.
 local labels = {}
 local function say(obj, key)
     labels[#labels + 1] = { obj, key }
@@ -54,60 +55,69 @@ local refresh
 local function hover(r)
     local h = r:CreateTexture(nil, "HIGHLIGHT")
     h:SetAllPoints()
-    h:SetColorTexture(1, 1, 1, 0.07)
+    h:SetColorTexture(1, 1, 1, 0.05)
 end
 
-local function newCheck(parent)
-    local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    c:SetSize(26, 26)
-    c:SetPoint("LEFT", 2, 0)
-    return c
+-- A clickable row with a check box on the left; a click anywhere on it toggles.
+local function checkRow(width, height, onToggle)
+    local r = CreateFrame("Button", nil, content)
+    r:SetSize(width, height)
+    hover(r)
+    r.check = S.Check(r, 26)
+    r.check:SetPoint("LEFT", 2, 0)
+    local function toggle()
+        if r.locked == true then return end
+        onToggle(r)
+        refresh()
+    end
+    r:SetScript("OnClick", toggle)
+    r.check:SetScript("OnClick", toggle)
+    return r
+end
+
+local function makeZoneRow()
+    local r = checkRow(LEFT_W, ZONE_H, function(self)
+        local all = true
+        for _, q in ipairs(self.data.quests) do all = all and q.checked end
+        for _, q in ipairs(self.data.quests) do q.checked = not all end
+    end)
+    r.text = S.Text(r, 13)
+    r.text:SetPoint("LEFT", r.check, "RIGHT", 2, 0)
+    r.text:SetPoint("RIGHT", -40, 0)
+    r.text:SetWordWrap(false)
+    r.count = S.Text(r, 11, S.MUTED)
+    r.count:SetPoint("RIGHT", -6, 0)
+    r.count:SetJustifyH("RIGHT")
+    return r
 end
 
 local function makeQuestRow()
-    local r = CreateFrame("Button", nil, content)
-    r:SetSize(LEFT_W, ROW_H)
-    hover(r)
-    r.check = newCheck(r)
-    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local r = checkRow(LEFT_W - 14, ROW_H, function(self) self.data.checked = not self.data.checked end)
+    r.text = S.Text(r, 12)
     r.text:SetPoint("LEFT", r.check, "RIGHT", 2, 0)
     r.text:SetPoint("RIGHT", -4, 0)
-    r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
-    r:SetScript("OnClick", function(self) self.check:Click() end)
-    r.check:SetScript("OnClick", function(self)
-        r.data.checked = self:GetChecked() and true or false
-        refresh()
-    end)
     return r
 end
 
 local function makeItemRow()
-    local r = CreateFrame("Button", nil, content)
-    r:SetHeight(ROW_H)
-    hover(r)
-    r.check = newCheck(r)
-    r.icon = r:CreateTexture(nil, "ARTWORK")
-    r.icon:SetSize(22, 22)
-    r.icon:SetPoint("LEFT", r.check, "RIGHT", 2, 0)
-    r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.text:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 6, 1)
+    local r = checkRow(200, ROW_H, function(self) self.data.checked = not self.data.checked end)
+    local frameIcon = CreateFrame("Frame", nil, r)
+    frameIcon:SetSize(24, 24)
+    frameIcon:SetPoint("LEFT", r.check, "RIGHT", 2, 0)
+    S.Box(frameIcon, { 0, 0, 0, 1 })
+    r.icon = frameIcon:CreateTexture(nil, "ARTWORK")
+    r.icon:SetPoint("TOPLEFT", 1, -1)
+    r.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    r.text = S.Text(r, 12)
+    r.text:SetPoint("TOPLEFT", frameIcon, "TOPRIGHT", 6, 1)
     r.text:SetPoint("RIGHT", -4, 0)
-    r.text:SetJustifyH("LEFT")
     r.text:SetWordWrap(false)
-    r.sub = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.sub:SetPoint("TOPLEFT", r.text, "BOTTOMLEFT", 0, -2)
+    r.sub = S.Text(r, 10, S.MUTED)
+    r.sub:SetPoint("TOPLEFT", r.text, "BOTTOMLEFT", 0, -3)
     r.sub:SetPoint("RIGHT", -4, 0)
-    r.sub:SetJustifyH("LEFT")
     r.sub:SetWordWrap(false)
-    r:SetScript("OnClick", function(self)
-        if self.check:IsEnabled() then self.check:Click() end
-    end)
-    r.check:SetScript("OnClick", function(self)
-        r.data.checked = self:GetChecked() and true or false
-        refresh()
-    end)
     r:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetBagItem(self.data.bag, self.data.slot)
@@ -120,10 +130,8 @@ end
 local function makeLabel()
     local r = CreateFrame("Frame", nil, content)
     r:SetSize(LEFT_W, ROW_H)
-    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    r.text:SetPoint("LEFT", 32, 0)
-    r.text:SetPoint("RIGHT", -4, 0)
-    r.text:SetJustifyH("LEFT")
+    r.text = S.Text(r, 13, S.MUTED)
+    r.text:SetPoint("LEFT", 30, 0)
     return r
 end
 
@@ -135,7 +143,7 @@ end
 
 local function makeBand()
     local t = content:CreateTexture(nil, "BACKGROUND", nil, -1)
-    t:SetColorTexture(1, 1, 1, 0.035)
+    t:SetTexture("Interface\\Buttons\\WHITE8X8")
     return t
 end
 
@@ -143,33 +151,43 @@ end
 
 local function levelText(level)
     local c = GetQuestDifficultyColor and GetQuestDifficultyColor(level)
-    local hex = c and string.format("|cff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) or GREY
-    return hex .. "[" .. level .. "]|r "
+    local hex = c and S.Hex({ c.r, c.g, c.b }) or S.Hex(S.MUTED)
+    return hex .. level .. "|r  "
 end
 
 local function connect(from, to, on)
     local l = take("line", makeLine)
     l:SetStartPoint("RIGHT", from, 0, 0)
     l:SetEndPoint("LEFT", to, 0, 0)
-    l:SetColorTexture(unpack(on and GOLD or DIM))
+    local c = on and S.Accent() or DIM
+    l:SetColorTexture(c[1], c[2], c[3], on and 0.9 or c[4])
 end
 
-local function placeItem(it, y, rightX, width)
+local function band(y, h, color)
+    local b = take("band", makeBand)
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", 0, -y)
+    b:SetSize(content:GetWidth(), h)
+    b:SetVertexColor(color[1], color[2], color[3], color[4])
+end
+
+local function placeItem(it, y, x, width)
     local r = take("item", makeItemRow)
     r.data = it
     r:ClearAllPoints()
-    r:SetPoint("TOPLEFT", rightX, -y)
+    r:SetPoint("TOPLEFT", x, -y)
     r:SetWidth(width)
     local blocked = false
     for _, q in ipairs(it.links) do
         if not q.checked then blocked = true end
     end
+    r.locked = blocked
     r.check:SetChecked(it.checked and not blocked)
     r.check:SetEnabled(not blocked)
     r.icon:SetTexture(it.icon)
-    r.text:SetText((it.link or it.name) .. (it.count > 1 and (GREY .. " x" .. it.count .. "|r") or ""))
+    r.text:SetText((it.link or it.name) .. (it.count > 1 and (S.Hex(S.MUTED) .. "  x" .. it.count .. "|r") or ""))
     r.sub:SetText(L[blocked and "WHY_QUEST_STAYS" or it.why])
-    r:SetAlpha(ns.ItemGoes(it) and 1 or 0.5)
+    r:SetAlpha(ns.ItemGoes(it) and 1 or 0.45)
     return r
 end
 
@@ -179,64 +197,72 @@ refresh = function()
     local rightX = LEFT_W + GAP
     local rightW = width - rightX
 
-    local first = {}   -- item -> the quest it is listed under
-    local byQuest = {}
+    -- Each item is listed under the first planned quest that needs it.
+    local byQuest, orphans = {}, {}
     for _, q in ipairs(plan.quests) do byQuest[q] = {} end
-    local orphans = {}
     for _, it in ipairs(plan.items) do
         local home
         for _, q in ipairs(it.links) do
             if byQuest[q] then home = q break end
         end
-        if home then
-            first[it] = home
-            table.insert(byQuest[home], it)
-        else
-            orphans[#orphans + 1] = it
-        end
+        if home then table.insert(byQuest[home], it) else orphans[#orphans + 1] = it end
     end
 
-    local y, odd = 0, true
+    local y = 0
     local questRow, itemRow = {}, {}
-    local function block(left, items, band)
-        local h = math.max(1, #items) * ROW_H
-        if band then
-            local b = take("band", makeBand)
-            b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", 0, -y)
-            b:SetSize(width, h)
-        end
-        left:ClearAllPoints()
-        left:SetPoint("TOPLEFT", 0, -y)
-        for i, it in ipairs(items) do
-            itemRow[it] = placeItem(it, y + (i - 1) * ROW_H, rightX, rightW)
-        end
-        y = y + h + 4
-    end
+    local accent = S.Accent()
+    for _, zone in ipairs(ns.Zones(plan.quests)) do
+        band(y, ZONE_H, { 1, 1, 1, 0.06 })
+        local z = take("zone", makeZoneRow)
+        z.data = zone
+        z:ClearAllPoints()
+        z:SetPoint("TOPLEFT", 0, -y)
+        local on = 0
+        for _, q in ipairs(zone.quests) do if q.checked then on = on + 1 end end
+        z.check:SetChecked(on == #zone.quests or (on > 0 and "some"))
+        z.text:SetText(S.Hex(accent) .. (zone.name ~= "" and zone.name or "?") .. "|r")
+        z.count:SetText(on .. "/" .. #zone.quests)
+        y = y + ZONE_H + 2
 
-    for _, q in ipairs(plan.quests) do
-        local r = take("quest", makeQuestRow)
-        r.data = q
-        r.check:SetChecked(q.checked)
-        r.text:SetText(levelText(q.level) .. q.title)
-        r:SetAlpha(q.checked and 1 or 0.5)
-        questRow[q] = r
-        block(r, byQuest[q], odd)
-        odd = not odd
+        for _, q in ipairs(zone.quests) do
+            local items = byQuest[q]
+            local h = math.max(1, #items) * ROW_H
+            local r = take("quest", makeQuestRow)
+            r.data = q
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", 14, -y)
+            r.check:SetChecked(q.checked)
+            r.text:SetText(levelText(q.level) .. q.title)
+            r:SetAlpha(q.checked and 1 or 0.45)
+            questRow[q] = r
+            for i, it in ipairs(items) do
+                itemRow[it] = placeItem(it, y + (i - 1) * ROW_H, rightX, rightW)
+            end
+            y = y + h + 2
+        end
+        y = y + 6
     end
     if #orphans > 0 then
+        band(y, ZONE_H, { 1, 1, 1, 0.06 })
         local label = take("label", makeLabel)
+        label:ClearAllPoints()
+        label:SetPoint("TOPLEFT", 0, -y)
+        label:SetHeight(ZONE_H)
         label.text:SetText(L.NO_QUEST)
-        block(label, orphans, odd)
-        for _, it in ipairs(orphans) do connect(label, itemRow[it], ns.ItemGoes(it)) end
+        y = y + ZONE_H + 2
+        for i, it in ipairs(orphans) do
+            itemRow[it] = placeItem(it, y + (i - 1) * ROW_H, rightX, rightW)
+            connect(label, itemRow[it], ns.ItemGoes(it))
+        end
+        y = y + #orphans * ROW_H
     end
-    -- Every link gets a line, also to quests an item is not listed under.
     for _, it in ipairs(plan.items) do
         for _, q in ipairs(it.links) do
             if questRow[q] and itemRow[it] then connect(questRow[q], itemRow[it], ns.ItemGoes(it)) end
         end
     end
     content:SetHeight(math.max(y, 1))
+    scroll:Update(y)
 
     local nq, ni = 0, 0
     for _, q in ipairs(plan.quests) do if q.checked then nq = nq + 1 end end
@@ -255,9 +281,9 @@ local function showSetup()
     frame:SetHeight(SETUP_H)
     local d = ns.db()
     edit:SetText(tostring(d.level or math.max(1, UnitLevel("player") - 10)))
-    checkQuests:SetChecked(d.quests)
-    checkItems:SetChecked(d.items)
-    setup.level:SetText(GREY .. L.YOUR_LEVEL:format(UnitLevel("player")))
+    checkQuests:SetChecked(d.quests ~= false)
+    checkItems:SetChecked(d.items ~= false)
+    setup.level:SetText(L.YOUR_LEVEL:format(UnitLevel("player")))
 end
 
 local function showPreview()
@@ -265,8 +291,8 @@ local function showPreview()
     preview:Show()
     frame:SetHeight(PREVIEW_H)
     local width = scroll:GetWidth()
-    content:SetWidth(width > 0 and width or W - 44)
-    scroll:SetVerticalScroll(0)
+    content:SetWidth(width > 0 and width or W - 40)
+    scroll:Top()
     refresh()
 end
 
@@ -278,8 +304,8 @@ local function onClear()
     end
     local d = ns.db()
     d.level = level
-    d.quests = checkQuests:GetChecked() and true or false
-    d.items = checkItems:GetChecked() and true or false
+    d.quests = checkQuests:GetChecked()
+    d.items = checkItems:GetChecked()
     plan.quests = d.quests and ns.PlanQuests(level) or {}
     plan.items = d.items and ns.PlanItems(plan.quests) or {}
     totals.quests, totals.items = 0, 0
@@ -322,143 +348,119 @@ end
 ---- Build ---------------------------------------------------------------------
 
 local function button(parent, key, width)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width or 100, 30)
+    local b = S.Button(parent, width, 30)
     say(b, key)
     return b
 end
 
-local function checkbox(parent, key)
-    local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    c:SetSize(26, 26)
-    local label = c:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+local function checkbox(parent, key, onClick)
+    local c = S.Check(parent, 26)
+    local label = S.Text(c, 13)
     label:SetPoint("LEFT", c, "RIGHT", 2, 0)
     say(label, key)
+    c:SetHitRectInsets(0, -(label:GetStringWidth() + 8), 0, 0)
+    c:SetScript("OnClick", function(self) self:SetChecked(not self:GetChecked()) end)
     return c
 end
 
 local function build()
-    frame = CreateFrame("Frame", "GulliQuestCleanerFrame", UIParent, "BasicFrameTemplateWithInset")
+    local accent = S.Accent()
+    frame = CreateFrame("Frame", "GulliQuestCleanerFrame", UIParent)
+    S.Box(frame, S.BG)
     frame:SetSize(W, SETUP_H)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true)
     frame:SetMovable(true)
     frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:Hide()
     tinsert(UISpecialFrames, "GulliQuestCleanerFrame")
 
-    local title = frame.TitleText
-    if not title then
-        title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        title:SetPoint("TOP", 0, -5)
-    end
-    title:SetText("|cff9ad0ffGulli|r-QuestCleaner")
+    -- Title bar: drag to move, a flat close button.
+    local bar = CreateFrame("Frame", nil, frame)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    bar:SetHeight(TITLE_H)
+    S.Box(bar, S.PANEL, { 0, 0, 0, 0 })
+    local line = bar:CreateTexture(nil, "ARTWORK")
+    line:SetTexture("Interface\\Buttons\\WHITE8X8")
+    line:SetVertexColor(accent[1], accent[2], accent[3], 0.8)
+    line:SetPoint("BOTTOMLEFT")
+    line:SetPoint("BOTTOMRIGHT")
+    line:SetHeight(1)
+    bar:EnableMouse(true)
+    bar:RegisterForDrag("LeftButton")
+    bar:SetScript("OnDragStart", function() frame:StartMoving() end)
+    bar:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    local title = S.Text(bar, 14)
+    title:SetPoint("LEFT", 10, 0)
+    title:SetText(S.Hex(accent) .. "Gulli|r-QuestCleaner")
+    local close = S.Button(bar, 24, 22)
+    close:SetPoint("RIGHT", -3, 0)
+    close:SetText("×")
+    close:SetScript("OnEnter", function(self) S.Fill(self, { 0.6, 0.1, 0.1, 1 }) end)
+    close:SetScript("OnLeave", function(self) S.Fill(self, S.PANEL) end)
+    close:SetScript("OnClick", function() frame:Hide() end)
 
-    status = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    status:SetPoint("BOTTOMLEFT", 16, 20)
-    status:SetPoint("RIGHT", -290, 0)
-    status:SetJustifyH("LEFT")
+    status = S.Text(frame, 12)
+    status:SetPoint("BOTTOMLEFT", 14, 20)
+    status:SetPoint("RIGHT", -280, 0)
 
     -- Setup view
     setup = CreateFrame("Frame", nil, frame)
     setup:SetAllPoints()
 
-    local label = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    label:SetPoint("TOPLEFT", 18, -42)
+    local label = S.Text(setup, 14)
+    label:SetPoint("TOPLEFT", 16, -(TITLE_H + 22))
     say(label, "LEVEL")
-    edit = CreateFrame("EditBox", nil, setup, "InputBoxTemplate")
-    edit:SetSize(36, 24)
+    edit = S.Edit(setup, 44)
     edit:SetPoint("LEFT", label, "RIGHT", 10, 0)
-    edit:SetAutoFocus(false)
     edit:SetNumeric(true)
     edit:SetMaxLetters(2)
-    edit:SetJustifyH("CENTER")
     edit:SetScript("OnEnterPressed", function(self) self:ClearFocus(); onClear() end)
     edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    local after = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    after:SetPoint("LEFT", edit, "RIGHT", 6, 0)
+    local after = S.Text(setup, 14)
+    after:SetPoint("LEFT", edit, "RIGHT", 10, 0)
     say(after, "OR_LOWER")
-    setup.level = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    setup.level:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -8)
+    setup.level = S.Text(setup, 11, S.MUTED)
+    setup.level:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -10)
 
     checkQuests = checkbox(setup, "DO_QUESTS")
-    checkQuests:SetPoint("TOPLEFT", setup.level, "BOTTOMLEFT", -4, -10)
+    checkQuests:SetPoint("TOPLEFT", setup.level, "BOTTOMLEFT", -6, -10)
     checkItems = checkbox(setup, "DO_ITEMS")
     checkItems:SetPoint("TOPLEFT", checkQuests, "BOTTOMLEFT", 0, -2)
 
-    local clear = button(setup, "CLEAR", 140)
-    clear:SetPoint("BOTTOMRIGHT", -14, 12)
+    local clear = button(setup, "CLEAR", 150)
+    clear:SetPoint("BOTTOMRIGHT", -12, 12)
     clear:SetScript("OnClick", onClear)
-
-    -- Language: "System" follows the game client, like the Runeloader app.
-    local langLabel = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    say(langLabel, "LANGUAGE")
-    langButton = button(setup, "SYSTEM", 130)
-    langButton:SetPoint("TOPRIGHT", -14, -36)
-    langLabel:SetPoint("RIGHT", langButton, "LEFT", -6, 0)
-    langMenu = CreateFrame("Frame", nil, frame)
-    langMenu:SetFrameStrata("FULLSCREEN_DIALOG")
-    langMenu:SetPoint("TOPRIGHT", langButton, "BOTTOMRIGHT", 0, -2)
-    langMenu:SetSize(130, #ns.TAGS * 26 + 8)
-    langMenu:EnableMouse(true)
-    local bg = langMenu:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.05, 0.05, 0.07, 0.96)
-    langMenu:Hide()
-    for i, tag in ipairs(ns.TAGS) do
-        local b = CreateFrame("Button", nil, langMenu)
-        b:SetSize(122, 26)
-        b:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 26)
-        hover(b)
-        local t = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        t:SetPoint("LEFT", 8, 0)
-        b.text = t
-        b.tag = tag
-        b:SetScript("OnClick", function()
-            ns.db().lang = tag
-            ns.SetLanguage(tag)
-            langMenu:Hide()
-            ns.ApplyTexts()
-        end)
-        langMenu[i] = b
-    end
-    langButton:SetScript("OnClick", function() langMenu:SetShown(not langMenu:IsShown()) end)
-    setup:SetScript("OnHide", function() langMenu:Hide() end)
 
     -- Preview view
     preview = CreateFrame("Frame", nil, frame)
     preview:SetAllPoints()
     preview:Hide()
 
-    questHead = preview:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    questHead:SetPoint("TOPLEFT", 16, -32)
-    itemHead = preview:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    itemHead:SetPoint("TOPLEFT", 14 + LEFT_W + GAP, -32)
+    questHead = S.Text(preview, 13, accent)
+    questHead:SetPoint("TOPLEFT", 16, -(TITLE_H + 12))
+    itemHead = S.Text(preview, 13, accent)
+    itemHead:SetPoint("TOPLEFT", 14 + LEFT_W + GAP, -(TITLE_H + 12))
 
-    scroll = CreateFrame("ScrollFrame", nil, preview, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 12, -52)
-    scroll:SetPoint("BOTTOMRIGHT", -32, 76)
-    content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(W - 44, 1)
-    scroll:SetScrollChild(content)
+    scroll = S.Scroll(preview)
+    scroll:SetPoint("TOPLEFT", 12, -(TITLE_H + 34))
+    scroll:SetPoint("BOTTOMRIGHT", -24, 84)
+    content = scroll.child
+    content:SetWidth(W - 40)
 
-    local hint = preview:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("BOTTOMLEFT", 16, 54)
-    hint:SetPoint("RIGHT", -16, 0)
-    hint:SetJustifyH("LEFT")
+    local hint = S.Text(preview, 11, S.MUTED)
+    hint:SetPoint("BOTTOMLEFT", 14, 58)
+    hint:SetPoint("RIGHT", -14, 0)
     say(hint, "HINT")
 
-    summary = preview:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    summary:SetPoint("BOTTOMLEFT", 16, 36)
-    summary:SetPoint("RIGHT", -290, 0)
-    summary:SetJustifyH("LEFT")
+    summary = S.Text(preview, 13)
+    summary:SetPoint("BOTTOMLEFT", 14, 38)
+    summary:SetPoint("RIGHT", -280, 0)
 
-    okButton = button(preview, "OK", 140)
-    okButton:SetPoint("BOTTOMRIGHT", -14, 12)
+    okButton = button(preview, "OK", 150)
+    okButton:SetPoint("BOTTOMRIGHT", -12, 12)
     okButton:SetScript("OnClick", onOK)
     backButton = button(preview, "BACK", 110)
     backButton:SetPoint("RIGHT", okButton, "LEFT", -8, 0)
@@ -473,13 +475,7 @@ end
 
 function ns.ApplyTexts()
     for _, e in ipairs(labels) do e[1]:SetText(L[e[2]]) end
-    local current = ns.db().lang or ""
-    langButton:SetText(ns.LanguageName(current))
-    for i, tag in ipairs(ns.TAGS) do
-        local b = langMenu[i]
-        b.text:SetText((tag == current and "|cffffd100" or "") .. ns.LanguageName(tag))
-    end
-    setup.level:SetText(GREY .. L.YOUR_LEVEL:format(UnitLevel("player")))
+    setup.level:SetText(L.YOUR_LEVEL:format(UnitLevel("player")))
     if preview:IsShown() then refresh() end
 end
 

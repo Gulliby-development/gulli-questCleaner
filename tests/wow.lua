@@ -9,6 +9,7 @@ local function stub()
         if k == "TitleText" then return nil end
         if k == "GetWidth" then return function() return 616 end end
         if k == "GetHeight" then return function() return 32 end end
+        if k == "GetStringWidth" or k == "GetValue" then return function() return 0 end end
         if k == "IsShown" or k == "IsEnabled" then return function() return true end end
         if k == "GetChecked" then return function() return true end end
         if k == "GetText" then return function() return rawget(t, "_text") end end
@@ -93,6 +94,9 @@ function Fake(spec)
     UIParent, GameTooltip, UISpecialFrames = stub(), stub(), {}
     tinsert = table.insert
     UnitLevel = function() return spec.level or 40 end
+    UnitClass = function() return "Mage", "MAGE" end
+    RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
+    STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     GetQuestDifficultyColor = function() return { r = 1, g = 0.5, b = 0 } end
     C_Timer = { After = function(_, f) f() end }
     print = function(...) W.printed[#W.printed + 1] = table.concat({ ... }, " ") end
@@ -103,14 +107,23 @@ end
 function Load(dir)
     dir = dir or "Gulli-QuestCleaner/"
     local ns = {}
-    for _, f in ipairs({ "Locales.lua", "Core.lua", "UI.lua" }) do
-        assert(loadfile(dir .. f))("Gulli-QuestCleaner", ns)
+    for line in io.lines(dir .. "Gulli-QuestCleaner.toc") do
+        line = line:gsub("\r", "")
+        if line:match("%.lua$") then assert(loadfile(dir .. line))("Gulli-QuestCleaner", ns) end
     end
     for _, f in ipairs(W.frames) do
         local onEvent = rawget(f, "_OnEvent")
         if onEvent then onEvent(f, "ADDON_LOADED", "Gulli-QuestCleaner") end
     end
     return ns
+end
+
+-- The text shown on a widget: its own, or that of its label (flat buttons keep it there).
+function TextOf(f)
+    local t = rawget(f, "_text")
+    if t then return t end
+    local label = rawget(f, "text")
+    return label and rawget(label, "_text")
 end
 
 -- Buttons of the built window, found by their text or a field.

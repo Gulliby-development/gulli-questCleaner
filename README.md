@@ -24,20 +24,20 @@ After a few zones, your quest log is full of grey quests, and your bags are full
 - **Old quests out.** Enter a level, and every quest of that level and lower is abandoned.
 - **Leftover quest items out.** Pelts for a quest you abandon, notes nobody asks for any more, items that start a quest you already did: they go too.
 - **See it before it goes.** Nothing is removed until you press **OK**. The list shows your quests on the left and their items on the right, with a line from each quest to its items. Items no quest needs hang under **No quest**.
+- **Sorted by zone.** Quests are grouped by zone, as in your quest log. Tick or untick a whole zone with one click.
 - **Keep what you want.** Untick a quest, and its items stay too. Untick an item, and the addon remembers it and does not offer it again.
 - **Safe by design.** An item a quest in your log still needs is never offered. Dungeon keys, Drakefire Amulet, Aqual Quintessence and other items that stay useful after their quest are never offered either.
 - **Small and quick.** One window, three buttons. Open it with `/gqc` or from the addon button on the minimap.
 - **Made for handhelds.** Big buttons and check boxes, so it works with a mouse and with touch on WoW Forever for Android.
-- **Your language.** English, German, Spanish, French, Polish, Portuguese, Russian and Chinese. It follows your game's language, or pick one with **Language**.
+- **Clean, modern look.** A flat dark window in your class colour, in the style of ElvUI. It fits a modern interface.
+- **Your language.** English, German, Spanish, French, Polish, Portuguese, Russian and Chinese. It follows the language of your game.
 
 <p align="center"><img src="docs/images/preview.png" alt="The preview: quests linked to their items" width="660"></p>
 
 <details>
 <summary><b>More pictures</b></summary>
 
-| Pick a level | Pick a language |
-| --- | --- |
-| <img src="docs/images/setup.png" alt="The first view: the level and what to clean" width="400"> | <img src="docs/images/language.png" alt="The language menu" width="400"> |
+<p align="center"><img src="docs/images/setup.png" alt="The first view: the level and what to clean" width="520"></p>
 </details>
 
 ## Install
@@ -54,8 +54,8 @@ After a few zones, your quest log is full of grey quests, and your bags are full
 
 1. Type `/gqc`, or click the addon button on the minimap.
 2. Enter a level. Quests of this level and lower are cleaned.
-3. Press **Clear**. The list shows what will go.
-4. Untick anything you want to keep.
+3. Press **Clear**. The list shows what will go, zone by zone.
+4. Untick anything you want to keep: a quest, an item or a whole zone.
 5. Press **OK**.
 
 > [!TIP]
@@ -84,7 +84,7 @@ A quest in your log still needs it, or it is one of the items that stay useful a
 <details>
 <summary><b>The window is in the wrong language</b></summary>
 
-Press **Language** and pick yours. **System** follows the language of your game.
+The addon uses the language of your game client. If your game's language is not one of the eight, it speaks English.
 </details>
 
 <details>
