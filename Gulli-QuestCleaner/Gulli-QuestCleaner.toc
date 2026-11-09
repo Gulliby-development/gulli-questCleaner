@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: |cff9ad0ffGulli|r-QuestCleaner
+## Notes: Abandon low-level quests and delete leftover quest items from your bags. Shows a list before anything is removed. /gqc
+## Notes-ruRU: Бросает квесты низкого уровня и удаляет из сумок ненужные квестовые предметы. Перед удалением показывает список. /gqc
+## Author: Gulliby
+## Version: 1.0.0
+## IconTexture: Interface\Icons\INV_Misc_Bag_08
+## SavedVariables: GulliQuestCleanerDB
+## AddonCompartmentFunc: GulliQuestCleaner_Toggle
+## Category: Quests
+## X-License: MIT
+
+Locales.lua
+Core.lua
+UI.lua
