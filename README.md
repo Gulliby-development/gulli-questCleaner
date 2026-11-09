@@ -21,12 +21,18 @@ After a few zones, your quest log is full of grey quests, and your bags are full
 
 ## Features
 
-- **Old quests out.** Enter a level, and every quest of that level and lower is abandoned.
+- **Old quests out.** Enter a level, and every quest of that level and lower is abandoned. Or press **Gray** to clean every quest that gives you almost no experience now.
 - **Leftover quest items out.** Pelts for a quest you abandon, notes nobody asks for any more, items that start a quest you already did: they go too.
 - **See it before it goes.** Nothing is removed until you press **OK**. The list shows your quests on the left and their items on the right, with a line from each quest to its items. Items no quest needs hang under **No quest**.
 - **Sorted by zone.** Quests are grouped by zone, as in your quest log. Tick or untick a whole zone with one click.
 - **Keep what you want.** Untick a quest, and its items stay too. Untick an item, and the addon remembers it and does not offer it again.
-- **Safe by design.** An item a quest in your log still needs is never offered. Dungeon keys, Drakefire Amulet, Aqual Quintessence and other items that stay useful after their quest are never offered either.
+- **Safe by design.** An item a quest in your log still needs is never offered. Dungeon keys, Drakefire Amulet, Juju, arcanums, summoning braziers and other items that stay useful after their quest are never offered either.
+- **Knows the quests ahead.** The addon carries a quest database. An item for a quest you have not taken yet, above your cleaning level, stays in your bags.
+- **Important quests stay.** Class quests, dungeon and raid quests and elite quests are not touched. Each has its own switch.
+- **Warns you.** A quest that started from an item is unticked, because it is hard to get again. A quest from a chain gets a mark.
+- **Sells when it can.** With a merchant open, items that have a price are sold instead of deleted.
+- **Shows what you get.** The list says how many places the quest log and the bags will have after **OK**.
+- **Reminds you.** When your quest log is almost full, one line in the chat says how many old quests `/gqc` can clean. `/gqc last` shows what the last cleaning removed.
 - **Small and quick.** One window, three buttons. Open it with `/gqc` or from the addon button on the minimap.
 - **Made for handhelds.** Big buttons and check boxes, so it works with a mouse and with touch on WoW Forever for Android.
 - **Clean, modern look.** A flat dark window in your class colour, in the style of ElvUI. It fits a modern interface.
@@ -53,7 +59,7 @@ After a few zones, your quest log is full of grey quests, and your bags are full
 ## How to use it
 
 1. Type `/gqc`, or click the addon button on the minimap.
-2. Enter a level. Quests of this level and lower are cleaned.
+2. Enter a level, or press **Gray**. Quests of this level and lower are cleaned. Each character keeps its own level.
 3. Press **Clear**. The list shows what will go, zone by zone.
 4. Untick anything you want to keep: a quest, an item or a whole zone.
 5. Press **OK**.
@@ -78,13 +84,19 @@ Untick it. The addon remembers it and does not offer it again. To forget all ite
 <details>
 <summary><b>Why is my quest item not in the list?</b></summary>
 
-A quest in your log still needs it, or it is one of the items that stay useful after their quest, such as a dungeon key. The addon keeps an item whenever it is not sure.
+A quest in your log still needs it, a quest you can still take needs it, or it is one of the items that stay useful after their quest, such as a dungeon key. The addon keeps an item whenever it is not sure. Below the list it says how many items it kept for quests you can still take.
 </details>
 
 <details>
 <summary><b>The window is in the wrong language</b></summary>
 
 The addon uses the language of your game client. If your game's language is not one of the eight, it speaks English.
+</details>
+
+<details>
+<summary><b>What did the last cleaning remove?</b></summary>
+
+Type `/gqc last`. An abandoned quest can be taken again from its quest giver.
 </details>
 
 <details>
@@ -99,9 +111,21 @@ No. Leave combat first. The addon never removes anything during a fight.
 <summary><b>What counts as a leftover quest item</b></summary>
 
 - A bag item is a quest item when its class is Quest, the game marks it as a quest item, or it starts a quest.
-- It is offered when no quest that stays in your log needs it: its name is not in that quest's objectives, summary or description, and it is not the quest's usable item.
+- It is offered when no quest that stays in your log needs it: its name is not in that quest's objectives, summary or description, it is not the quest's usable item, and the quest database does not list it for that quest.
+- It stays when the database lists it for a quest above the cleaning level that the character can still take: not done, not closed by a quest already done, and open to the character's race, class and level.
 - An item that starts a quest is offered only when that quest is already done.
-- Items in the built-in list of lasting items (keys, attunements, raid summoning items) and items you unticked before are never offered.
+- Items in the built-in list of lasting items (keys, attunements, raid summoning items), quest-class rewards no quest asks for, and items you unticked before are never offered.
+</details>
+
+<details>
+<summary><b>The quest database</b></summary>
+
+`Gulli-QuestCleaner/Data.lua` is made from the [QuestieDB](https://github.com/Questie/QuestieDB) Forever data by `tools/build_data.py` (Python 3, standard library). It reads the data files as plain tables and runs no QuestieDB code:
+
+```sh
+git clone --depth 1 https://github.com/Questie/QuestieDB /tmp/questiedb
+python3 tools/build_data.py /tmp/questiedb
+```
 </details>
 
 <details>
@@ -128,5 +152,6 @@ lua5.1 tests/test.lua
 
 <p align="center">
   <img src="docs/images/icon.png" alt="" width="56"><br>
-  <sub>Gulli-QuestCleaner is a fan project. It is not affiliated with Blizzard Entertainment.</sub>
+  <sub>Gulli-QuestCleaner is a fan project. It is not affiliated with Blizzard Entertainment.<br>
+  It is free software under the <a href="LICENSE">GPLv3</a>. The quest data comes from <a href="https://github.com/Questie/QuestieDB">QuestieDB</a> by the Questie team and contributors.</sub>
 </p>

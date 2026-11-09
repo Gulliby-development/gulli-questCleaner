@@ -30,6 +30,13 @@ local PERMANENT = {
     [6948] = true,  -- Hearthstone
 }
 
+-- Generated from QuestieDB (Data.lua): which quests ask for each quest item, who can
+-- still take them, and quest items that stay useful after their quest.
+local function data()
+    return ns.Data or { need = {}, quest = {}, keep = {}, itemStart = {}, chain = {}, class = {} }
+end
+
+-- Account-wide: what to clean and what to protect, items the player kept.
 local function db()
     GulliQuestCleanerDB = GulliQuestCleanerDB or {}
     local d = GulliQuestCleanerDB
@@ -37,6 +44,16 @@ local function db()
     return d
 end
 ns.db = db
+
+-- Per character: the level and the last cleaning. A character without a level takes the
+-- one saved account-wide by older versions.
+local function charDB()
+    GulliQuestCleanerCharDB = GulliQuestCleanerCharDB or {}
+    local c = GulliQuestCleanerCharDB
+    if c.level == nil then c.level = db().level end
+    return c
+end
+ns.charDB = charDB
 
 function ns.Print(msg)
     print("|cff9ad0ffGulli-QuestCleaner|r: " .. msg)
@@ -76,6 +93,49 @@ function ns.Quests()
         end
     end
     return out
+end
+
+-- The most quests the log holds.
+function ns.MaxQuests()
+    if C_QuestLog and C_QuestLog.GetMaxNumQuestsCanAccept then
+        return C_QuestLog.GetMaxNumQuestsCanAccept() or 20
+    end
+    return MAX_QUESTS or 20
+end
+
+-- tagID (Enum.QuestTag) and whether the quest is elite.
+local function questTag(questID)
+    if C_QuestLog and C_QuestLog.GetQuestTagInfo then
+        local info = C_QuestLog.GetQuestTagInfo(questID)
+        if info then return info.tagID, info.isElite end
+    end
+end
+
+local TAG_GROUP, TAG_RAID, TAG_DUNGEON = 1, 62, 81
+local TAG_RAID10, TAG_RAID25 = 88, 89
+
+-- Why a quest is never planned, as a setting key, or nil.
+local function protectedBy(questID)
+    local d = db()
+    if d.keepClass ~= false and data().class[questID] then return "keepClass" end
+    local tag, elite = questTag(questID)
+    if d.keepDungeon ~= false and (tag == TAG_DUNGEON or tag == TAG_RAID or tag == TAG_RAID10 or tag == TAG_RAID25) then
+        return "keepDungeon"
+    end
+    if d.keepElite ~= false and (elite or tag == TAG_GROUP) then return "keepElite" end
+end
+
+-- The highest quest level that is gray (trivial) for the player.
+function ns.GrayLevel()
+    local level = UnitLevel("player") or 1
+    local range = (UnitQuestTrivialLevelRange and UnitQuestTrivialLevelRange("player"))
+        or (GetQuestGreenRange and GetQuestGreenRange())
+    if range then return math.max(0, level - range - 1) end
+    -- Vanilla's gray level when the client has neither call.
+    if level <= 5 then return 0 end
+    if level <= 39 then return level - 5 - math.floor(level / 10) end
+    if level <= 59 then return level - 1 - math.floor(level / 5) end
+    return level - 9
 end
 
 local function inLog(questID)
@@ -168,6 +228,46 @@ local function questDone(questID)
     return IsQuestFlaggedCompleted and IsQuestFlaggedCompleted(questID)
 end
 
+local function freeSlots()
+    local free = 0
+    for bag = 0, lastBag() do
+        if C_Container and C_Container.GetContainerNumFreeSlots then
+            free = free + (C_Container.GetContainerNumFreeSlots(bag) or 0)
+        elseif GetContainerNumFreeSlots then
+            free = free + (GetContainerNumFreeSlots(bag) or 0)
+        end
+    end
+    return free
+end
+ns.FreeSlots = freeSlots
+
+local function sellPrice(itemID)
+    local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+    if not getInfo then return 0 end
+    return select(11, getInfo(itemID)) or 0
+end
+
+-- Whether bit `id` (1-based) is set in a race or class mask; 0 means everyone. Masks pass
+-- 2^32 on Forever, past what bit.band takes, so this uses plain arithmetic.
+local function hasBit(mask, id)
+    if not mask or mask == 0 or not id then return true end
+    return math.floor(mask / 2 ^ (id - 1)) % 2 == 1
+end
+
+-- A quest the player can still take: not done, not closed by a quest they did, and open
+-- to their race, class and level.
+local function canTake(questID)
+    local q = data().quest[questID]
+    if not q or questDone(questID) then return false end
+    if not hasBit(q[2], select(3, UnitRace("player"))) then return false end
+    if not hasBit(q[3], select(3, UnitClass("player"))) then return false end
+    if q[4] > 0 and (UnitLevel("player") or 1) > q[4] then return false end
+    for _, other in ipairs(q[5] or {}) do
+        if questDone(other) then return false end
+    end
+    return true
+end
+
 -- Quest items in the bags: { bag, slot, itemID, link, name, count, icon, starts }.
 local function bagQuestItems()
     local out = {}
@@ -189,12 +289,19 @@ end
 
 ---- Plan ----------------------------------------------------------------------
 
--- Quests at or below maxLevel, each ticked.
+-- Quests at or below maxLevel, except the kinds the player protects. A quest that an
+-- item started is hard to take again, so it starts unticked; a quest in a chain gets a mark.
 function ns.PlanQuests(maxLevel)
     local out = {}
+    local D = data()
     for _, q in ipairs(ns.Quests()) do
-        if q.level > 0 and q.level <= maxLevel then
-            q.checked = true
+        if q.level > 0 and q.level <= maxLevel and not protectedBy(q.questID) then
+            if D.itemStart[q.questID] then
+                q.warn = "TAG_ITEM"
+            elseif D.chain[q.questID] then
+                q.warn = "TAG_CHAIN"
+            end
+            q.checked = q.warn ~= "TAG_ITEM"
             out[#out + 1] = q
         end
     end
@@ -224,8 +331,15 @@ end
 
 -- Quest items that only the planned quests need, or no quest at all. Each item
 -- lists the planned quests that need it (links). Quests outside the plan stay,
--- so their items are never offered. Items the player kept before stay out.
-function ns.PlanItems(planned)
+-- so their items are never offered. Items the player kept before stay out, and so do
+-- items for a quest above maxLevel the player can still take. Returns the plan and
+-- the items kept for such quests.
+function ns.PlanItems(planned, maxLevel)
+    if not maxLevel then
+        maxLevel = 0
+        for _, q in ipairs(planned or {}) do maxLevel = math.max(maxLevel, q.level) end
+    end
+    local D = data()
     local inPlan = {}
     for _, q in ipairs(planned or {}) do
         local text, ids = {}, {}
@@ -233,25 +347,45 @@ function ns.PlanItems(planned)
         q.blob, q.ids = table.concat(text, "\n"):lower(), ids
         inPlan[q.questID] = true
     end
-    local staying = {}
+    local staying, logged = {}, {}
     for _, q in ipairs(ns.Quests()) do
+        logged[q.questID] = true
         if not inPlan[q.questID] then staying[#staying + 1] = q end
+    end
+    -- What the data says about an item: a quest in the log that stays needs it, or a
+    -- quest above the level still to take; else the planned quests that need it.
+    local function fromData(it)
+        local future
+        for _, qid in ipairs(D.need[it.itemID] or {}) do
+            if logged[qid] then
+                if not inPlan[qid] then return "stays" end
+            elseif not future then
+                local q = D.quest[qid]
+                if q and q[1] > maxLevel and canTake(qid) then future = qid end
+            end
+        end
+        return future and "future"
     end
     local keepBlob, keepIds = needsOf(staying)
     local keep = db().keep
 
-    local out = {}
+    local out, future = {}, {}
     for _, it in ipairs(bagQuestItems()) do
-        if not PERMANENT[it.itemID] and not keep[it.itemID] then
+        if not PERMANENT[it.itemID] and not D.keep[it.itemID] and not keep[it.itemID] then
             it.links = {}
-            if it.starts then
+            local known = not it.starts and fromData(it)
+            if known == "future" then
+                future[#future + 1] = it
+            elseif it.starts then
                 if questDone(it.starts) then
                     it.why = "WHY_DONE"
                     out[#out + 1] = it
                 end
-            elseif not needed(it, keepBlob, keepIds) then
+            elseif not known and not needed(it, keepBlob, keepIds) then
+                local wants = {}
+                for _, qid in ipairs(D.need[it.itemID] or {}) do wants[qid] = true end
                 for _, q in ipairs(planned or {}) do
-                    if needed(it, q.blob, q.ids) then it.links[#it.links + 1] = q end
+                    if wants[q.questID] or needed(it, q.blob, q.ids) then it.links[#it.links + 1] = q end
                 end
                 it.why = #it.links > 0 and "WHY_ABANDONED" or "WHY_NO_QUEST"
                 out[#out + 1] = it
@@ -260,7 +394,7 @@ function ns.PlanItems(planned)
         end
     end
     table.sort(out, function(a, b) return a.name < b.name end)
-    return out
+    return out, future
 end
 
 -- An item goes only when the player ticked it and every quest it is for goes too.
@@ -288,6 +422,14 @@ local function abandon(q)
     end
 end
 
+local function useItem(bag, slot)
+    if C_Container and C_Container.UseContainerItem then
+        C_Container.UseContainerItem(bag, slot)
+    else
+        UseContainerItem(bag, slot)
+    end
+end
+
 local function cursorItemID()
     local kind, id = GetCursorInfo()
     if kind == "item" then return id end
@@ -305,24 +447,33 @@ end
 -- inside a hardware event. The game confirms a delete later, so the cursor can still
 -- show the item right after DeleteCursorItem: never stop the run on that, clear the
 -- cursor and go on to the next item. ns.Leftover tells afterwards what really went.
--- Returns the quests and the item stacks it tried.
+-- With a merchant open, an item that has a price is sold instead.
+-- Returns the quests, the item stacks it tried to delete and the stacks it sold.
 function ns.Run(quests, items)
     if InCombatLockdown() then
         ns.Print(L.IN_COMBAT)
-        return 0, 0
+        return 0, 0, 0
     end
     ClearCursor()
-    local abandoned, deleted = 0, 0
+    local abandoned, deleted, sold = 0, 0, 0
+    local last = { time = time and time() or 0, quests = {}, items = {} }
     for _, q in ipairs(quests or {}) do
         if q.checked and inLog(q.questID) then
             abandon(q)
             abandoned = abandoned + 1
+            last.quests[#last.quests + 1] = q.title
         end
     end
     for _, it in ipairs(items or {}) do
         if ns.ItemGoes(it) then
             local id, _, _, locked = slotInfo(it.bag, it.slot)
             if id == it.itemID and not locked then
+                last.items[#last.items + 1] = it.name
+            end
+            if id == it.itemID and not locked and ns.atMerchant and sellPrice(it.itemID) > 0 then
+                useItem(it.bag, it.slot)
+                sold = sold + 1
+            elseif id == it.itemID and not locked then
                 pickup(it.bag, it.slot)
                 if cursorItemID() == it.itemID then
                     DeleteCursorItem()
@@ -332,7 +483,8 @@ function ns.Run(quests, items)
             end
         end
     end
-    return abandoned, deleted
+    if #last.quests + #last.items > 0 then charDB().last = last end
+    return abandoned, deleted, sold
 end
 
 -- What is still there of a plan after a run: ticked quests still in the log and
@@ -350,15 +502,60 @@ end
 
 ---- Setup ---------------------------------------------------------------------
 
+-- When the log is nearly full, say once in the chat how many old quests /gqc would
+-- abandon. Only a hint: nothing goes without the window.
+local hinted = false
+local function logHint()
+    local n, max = #ns.Quests(), ns.MaxQuests()
+    if max - n > 2 then
+        hinted = false
+        return
+    end
+    local level = charDB().level
+    if hinted or not level then return end
+    local count = 0
+    for _, q in ipairs(ns.PlanQuests(level)) do
+        if q.checked then count = count + 1 end
+    end
+    if count > 0 then
+        hinted = true
+        ns.Print(L.LOG_FULL:format(n, max, count))
+    end
+end
+ns.LogHint = logHint
+
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
-f:SetScript("OnEvent", function(_, _, name)
-    if name ~= ADDON then return end
-    f:UnregisterEvent("ADDON_LOADED")
-    local d = db()
-    if d.quests == nil then d.quests = true end
-    if d.items == nil then d.items = true end
+f:RegisterEvent("MERCHANT_SHOW")
+f:RegisterEvent("MERCHANT_CLOSED")
+f:RegisterEvent("QUEST_ACCEPTED")
+f:SetScript("OnEvent", function(_, event, name)
+    if event == "MERCHANT_SHOW" then
+        ns.atMerchant = true
+    elseif event == "MERCHANT_CLOSED" then
+        ns.atMerchant = false
+    elseif event == "QUEST_ACCEPTED" then
+        logHint()
+    elseif name == ADDON then
+        f:UnregisterEvent("ADDON_LOADED")
+        local d = db()
+        if d.quests == nil then d.quests = true end
+        if d.items == nil then d.items = true end
+        charDB()
+    end
 end)
+
+-- The last cleaning of this character, in the chat.
+local function printLast()
+    local last = charDB().last
+    if not last then
+        ns.Print(L.LAST_NONE)
+        return
+    end
+    ns.Print(L.LAST:format(#last.quests, #last.items))
+    for _, t in ipairs(last.quests) do print("  " .. t) end
+    for _, t in ipairs(last.items) do print("  " .. t) end
+end
 
 SLASH_GULLIQUESTCLEANER1 = "/gqc"
 SLASH_GULLIQUESTCLEANER2 = "/questcleaner"
@@ -367,6 +564,8 @@ SlashCmdList.GULLIQUESTCLEANER = function(msg)
     if msg == "reset" then
         wipe(db().keep)
         ns.Print(L.KEEP_RESET)
+    elseif msg == "last" then
+        printLast()
     elseif msg == "help" then
         ns.Print(L.HELP)
     else

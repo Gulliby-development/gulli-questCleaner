@@ -6,16 +6,17 @@ local S = ns.Skin
 -- and their quests on the left, items on the right, a line from each quest to the items
 -- it needs. Items no quest needs hang off a "No quest" label at the end.
 local W = 680
-local SETUP_H, PREVIEW_H = 214, 520
+local SETUP_H, PREVIEW_H = 244, 540
 local TITLE_H = 28
 local ROW_H, ZONE_H = 32, 28
 local LEFT_W, GAP = 262, 52
 local DIM = { 0.55, 0.55, 0.58, 0.35 }
 
-local frame, setup, preview, status, summary
+local frame, setup, preview, status, summary, frees
 local edit, checkQuests, checkItems
+local protect = {}
 local scroll, content, okButton, backButton, questHead, itemHead
-local plan = { quests = {}, items = {} }
+local plan = { quests = {}, items = {}, future = {} }
 local totals = { quests = 0, items = 0 }
 local pools = { zone = {}, quest = {}, item = {}, label = {}, line = {}, band = {} }
 local used = {}
@@ -232,7 +233,8 @@ refresh = function()
             r:ClearAllPoints()
             r:SetPoint("TOPLEFT", 14, -y)
             r.check:SetChecked(q.checked)
-            r.text:SetText(levelText(q.level) .. q.title)
+            local tag = q.warn and ("  " .. S.Hex({ 1, 0.6, 0.2 }) .. L[q.warn] .. "|r") or ""
+            r.text:SetText(levelText(q.level) .. q.title .. tag)
             r:SetAlpha(q.checked and 1 or 0.45)
             questRow[q] = r
             for i, it in ipairs(items) do
@@ -270,6 +272,8 @@ refresh = function()
     questHead:SetText(L.QUESTS_N:format(nq, #plan.quests))
     itemHead:SetText(L.ITEMS_N:format(ni, #plan.items))
     summary:SetText(L.SUMMARY:format(nq, ni))
+    local inLog, freeNow = #ns.Quests(), ns.FreeSlots()
+    frees:SetText(L.FREES:format(inLog, inLog - nq, ns.MaxQuests(), freeNow, freeNow + ni))
     okButton:SetEnabled(nq + ni > 0)
 end
 
@@ -280,9 +284,10 @@ local function showSetup()
     setup:Show()
     frame:SetHeight(SETUP_H)
     local d = ns.db()
-    edit:SetText(tostring(d.level or math.max(1, UnitLevel("player") - 10)))
+    edit:SetText(tostring(ns.charDB().level or math.max(1, UnitLevel("player") - 10)))
     checkQuests:SetChecked(d.quests ~= false)
     checkItems:SetChecked(d.items ~= false)
+    for key, c in pairs(protect) do c:SetChecked(d[key] ~= false) end
     setup.level:SetText(L.YOUR_LEVEL:format(UnitLevel("player")))
 end
 
@@ -303,17 +308,20 @@ local function onClear()
         return
     end
     local d = ns.db()
-    d.level = level
+    ns.charDB().level = level
     d.quests = checkQuests:GetChecked()
     d.items = checkItems:GetChecked()
+    for key, c in pairs(protect) do d[key] = c:GetChecked() and true or false end
     plan.quests = d.quests and ns.PlanQuests(level) or {}
-    plan.items = d.items and ns.PlanItems(plan.quests) or {}
+    plan.items, plan.future = {}, {}
+    if d.items then plan.items, plan.future = ns.PlanItems(plan.quests, level) end
     totals.quests, totals.items = 0, 0
+    local kept = #plan.future > 0 and L.FUTURE:format(#plan.future) or ""
     if #plan.quests + #plan.items == 0 then
-        setStatus(L.NOTHING)
+        setStatus(L.NOTHING .. (kept ~= "" and ("  " .. kept) or ""))
         return
     end
-    setStatus("")
+    setStatus(kept)
     showPreview()
 end
 
@@ -405,7 +413,7 @@ local function build()
     close:SetScript("OnClick", function() frame:Hide() end)
 
     status = S.Text(frame, 12)
-    status:SetPoint("BOTTOMLEFT", 14, 20)
+    status:SetPoint("BOTTOMLEFT", 14, 16)
     status:SetPoint("RIGHT", -280, 0)
 
     -- Setup view
@@ -424,6 +432,9 @@ local function build()
     local after = S.Text(setup, 14)
     after:SetPoint("LEFT", edit, "RIGHT", 10, 0)
     say(after, "OR_LOWER")
+    local gray = button(setup, "GRAY", 90)
+    gray:SetPoint("LEFT", after, "RIGHT", 12, 0)
+    gray:SetScript("OnClick", function() edit:SetText(tostring(math.max(1, ns.GrayLevel()))) end)
     setup.level = S.Text(setup, 11, S.MUTED)
     setup.level:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -10)
 
@@ -431,6 +442,18 @@ local function build()
     checkQuests:SetPoint("TOPLEFT", setup.level, "BOTTOMLEFT", -6, -10)
     checkItems = checkbox(setup, "DO_ITEMS")
     checkItems:SetPoint("TOPLEFT", checkQuests, "BOTTOMLEFT", 0, -2)
+
+    -- Kinds of quests that are never planned.
+    local above = checkQuests
+    for i, key in ipairs({ "keepClass", "keepDungeon", "keepElite" }) do
+        local c = checkbox(setup, ({ "KEEP_CLASS", "KEEP_DUNGEON", "KEEP_ELITE" })[i])
+        if i == 1 then
+            c:SetPoint("TOPLEFT", checkQuests, "TOPLEFT", 330, 0)
+        else
+            c:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -2)
+        end
+        protect[key], above = c, c
+    end
 
     local clear = button(setup, "CLEAR", 150)
     clear:SetPoint("BOTTOMRIGHT", -12, 12)
@@ -448,18 +471,22 @@ local function build()
 
     scroll = S.Scroll(preview)
     scroll:SetPoint("TOPLEFT", 12, -(TITLE_H + 34))
-    scroll:SetPoint("BOTTOMRIGHT", -24, 84)
+    scroll:SetPoint("BOTTOMRIGHT", -24, 100)
     content = scroll.child
     content:SetWidth(W - 40)
 
     local hint = S.Text(preview, 11, S.MUTED)
-    hint:SetPoint("BOTTOMLEFT", 14, 58)
+    hint:SetPoint("BOTTOMLEFT", 14, 76)
     hint:SetPoint("RIGHT", -14, 0)
     say(hint, "HINT")
 
     summary = S.Text(preview, 13)
-    summary:SetPoint("BOTTOMLEFT", 14, 38)
+    summary:SetPoint("BOTTOMLEFT", 14, 56)
     summary:SetPoint("RIGHT", -280, 0)
+
+    frees = S.Text(preview, 11, S.MUTED)
+    frees:SetPoint("BOTTOMLEFT", 14, 38)
+    frees:SetPoint("RIGHT", -280, 0)
 
     okButton = button(preview, "OK", 150)
     okButton:SetPoint("BOTTOMRIGHT", -12, 12)
