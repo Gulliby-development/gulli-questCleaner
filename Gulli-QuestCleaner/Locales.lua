@@ -1,6 +1,17 @@
 local _, ns = ...
 
-local L = {
+-- The same languages as the Runeloader app. The empty tag follows the game
+-- client's language; English is the base and the fallback for a missing key.
+ns.TAGS = { "", "en", "de", "es", "fr", "pl", "pt", "ru", "zh" }
+-- Each language by its own name, so a player finds theirs whatever the current one.
+ns.NAMES = { false, "English", "Deutsch", "Español", "Français", "Polski", "Português", "Русский", "中文" }
+
+local CLIENT = { enUS = "en", enGB = "en", deDE = "de", esES = "es", esMX = "es", frFR = "fr",
+                 ptBR = "pt", ptPT = "pt", ruRU = "ru", zhCN = "zh", zhTW = "zh" }
+
+local T = {}
+
+T.en = {
     LEVEL = "Abandon quests of level",
     OR_LOWER = "and lower",
     YOUR_LEVEL = "Your level: %d",
@@ -9,11 +20,12 @@ local L = {
     CLEAR = "Clear",
     OK = "OK",
     BACK = "Back",
+    LANGUAGE = "Language",
+    SYSTEM = "System",
     QUESTS_N = "Quests: %d of %d",
     ITEMS_N = "Items: %d of %d",
     SUMMARY = "Abandon %d quests, delete %d items",
     NO_QUEST = "No quest",
-    WHY_QUEST_STAYS = "kept: its quest stays",
     HINT = "Untick what you want to keep. Unticked items are kept next time too.",
     NOTHING = "Nothing to clean.",
     BAD_LEVEL = "Enter a level from 1 to 99.",
@@ -23,35 +35,230 @@ local L = {
     WHY_ABANDONED = "for a quest you abandon",
     WHY_NO_QUEST = "no quest in your log needs it",
     WHY_DONE = "starts a quest you already did",
+    WHY_QUEST_STAYS = "kept: its quest stays",
     KEEP_RESET = "Forgot all kept items.",
     HELP = "/gqc opens the window, /gqc reset forgets kept items.",
 }
 
-if GetLocale() == "ruRU" then
-    L.LEVEL = "Бросить квесты уровня"
-    L.OR_LOWER = "и ниже"
-    L.YOUR_LEVEL = "Ваш уровень: %d"
-    L.DO_QUESTS = "Бросать квесты"
-    L.DO_ITEMS = "Удалять ненужные квестовые предметы"
-    L.CLEAR = "Очистить"
-    L.OK = "OK"
-    L.BACK = "Назад"
-    L.QUESTS_N = "Квесты: %d из %d"
-    L.ITEMS_N = "Предметы: %d из %d"
-    L.SUMMARY = "Бросить квестов: %d, удалить предметов: %d"
-    L.NO_QUEST = "Без квеста"
-    L.WHY_QUEST_STAYS = "останется: его квест остаётся"
-    L.HINT = "Снимите галочку с того, что нужно оставить. Такие предметы останутся и в следующий раз."
-    L.NOTHING = "Чистить нечего."
-    L.BAD_LEVEL = "Введите уровень от 1 до 99."
-    L.IN_COMBAT = "Не в бою."
-    L.DONE = "Готово: брошено квестов %d, удалено стопок предметов %d."
-    L.LEFT = "Осталось %d. Нажмите OK ещё раз."
-    L.WHY_ABANDONED = "для квеста, который бросаете"
-    L.WHY_NO_QUEST = "не нужен ни одному квесту в журнале"
-    L.WHY_DONE = "начинает уже сделанный квест"
-    L.KEEP_RESET = "Список сохраняемых предметов очищен."
-    L.HELP = "/gqc открывает окно, /gqc reset забывает сохраняемые предметы."
+T.de = {
+    LEVEL = "Quests bis Stufe",
+    OR_LOWER = "abbrechen",
+    YOUR_LEVEL = "Deine Stufe: %d",
+    DO_QUESTS = "Quests abbrechen",
+    DO_ITEMS = "Übrige Questgegenstände löschen",
+    CLEAR = "Aufräumen",
+    OK = "OK",
+    BACK = "Zurück",
+    LANGUAGE = "Sprache",
+    SYSTEM = "System",
+    QUESTS_N = "Quests: %d von %d",
+    ITEMS_N = "Gegenstände: %d von %d",
+    SUMMARY = "%d Quests abbrechen, %d Gegenstände löschen",
+    NO_QUEST = "Keine Quest",
+    HINT = "Entferne den Haken bei allem, was du behalten willst. Diese Gegenstände bleiben auch beim nächsten Mal.",
+    NOTHING = "Nichts aufzuräumen.",
+    BAD_LEVEL = "Gib eine Stufe von 1 bis 99 ein.",
+    IN_COMBAT = "Nicht im Kampf.",
+    DONE = "Fertig: %d Quests abgebrochen, %d Stapel gelöscht.",
+    LEFT = "Noch %d übrig. Drücke erneut OK.",
+    WHY_ABANDONED = "für eine Quest, die du abbrichst",
+    WHY_NO_QUEST = "keine Quest im Log braucht ihn",
+    WHY_DONE = "startet eine Quest, die du schon erledigt hast",
+    WHY_QUEST_STAYS = "bleibt: seine Quest bleibt",
+    KEEP_RESET = "Liste der behaltenen Gegenstände geleert.",
+    HELP = "/gqc öffnet das Fenster, /gqc reset vergisst behaltene Gegenstände.",
+}
+
+T.es = {
+    LEVEL = "Abandonar misiones de nivel",
+    OR_LOWER = "o menos",
+    YOUR_LEVEL = "Tu nivel: %d",
+    DO_QUESTS = "Abandonar misiones",
+    DO_ITEMS = "Borrar objetos de misión sobrantes",
+    CLEAR = "Limpiar",
+    OK = "Aceptar",
+    BACK = "Atrás",
+    LANGUAGE = "Idioma",
+    SYSTEM = "Sistema",
+    QUESTS_N = "Misiones: %d de %d",
+    ITEMS_N = "Objetos: %d de %d",
+    SUMMARY = "Abandonar %d misiones, borrar %d objetos",
+    NO_QUEST = "Sin misión",
+    HINT = "Desmarca lo que quieras conservar. Esos objetos también se conservan la próxima vez.",
+    NOTHING = "No hay nada que limpiar.",
+    BAD_LEVEL = "Escribe un nivel del 1 al 99.",
+    IN_COMBAT = "No en combate.",
+    DONE = "Hecho: %d misiones abandonadas, %d montones borrados.",
+    LEFT = "Quedan %d. Pulsa Aceptar otra vez.",
+    WHY_ABANDONED = "para una misión que abandonas",
+    WHY_NO_QUEST = "ninguna misión del registro lo necesita",
+    WHY_DONE = "inicia una misión que ya hiciste",
+    WHY_QUEST_STAYS = "se queda: su misión se queda",
+    KEEP_RESET = "Lista de objetos conservados vaciada.",
+    HELP = "/gqc abre la ventana, /gqc reset olvida los objetos conservados.",
+}
+
+T.fr = {
+    LEVEL = "Abandonner les quêtes de niveau",
+    OR_LOWER = "et moins",
+    YOUR_LEVEL = "Votre niveau : %d",
+    DO_QUESTS = "Abandonner les quêtes",
+    DO_ITEMS = "Supprimer les objets de quête restants",
+    CLEAR = "Nettoyer",
+    OK = "OK",
+    BACK = "Retour",
+    LANGUAGE = "Langue",
+    SYSTEM = "Système",
+    QUESTS_N = "Quêtes : %d sur %d",
+    ITEMS_N = "Objets : %d sur %d",
+    SUMMARY = "Abandonner %d quêtes, supprimer %d objets",
+    NO_QUEST = "Aucune quête",
+    HINT = "Décochez ce que vous voulez garder. Ces objets seront aussi gardés la prochaine fois.",
+    NOTHING = "Rien à nettoyer.",
+    BAD_LEVEL = "Entrez un niveau de 1 à 99.",
+    IN_COMBAT = "Pas en combat.",
+    DONE = "Terminé : %d quêtes abandonnées, %d piles supprimées.",
+    LEFT = "Il en reste %d. Appuyez encore sur OK.",
+    WHY_ABANDONED = "pour une quête que vous abandonnez",
+    WHY_NO_QUEST = "aucune quête du journal n'en a besoin",
+    WHY_DONE = "lance une quête déjà faite",
+    WHY_QUEST_STAYS = "gardé : sa quête reste",
+    KEEP_RESET = "Liste des objets gardés vidée.",
+    HELP = "/gqc ouvre la fenêtre, /gqc reset oublie les objets gardés.",
+}
+
+T.pl = {
+    LEVEL = "Porzuć zadania z poziomu",
+    OR_LOWER = "i niższe",
+    YOUR_LEVEL = "Twój poziom: %d",
+    DO_QUESTS = "Porzucaj zadania",
+    DO_ITEMS = "Usuwaj zbędne przedmioty z zadań",
+    CLEAR = "Wyczyść",
+    OK = "OK",
+    BACK = "Wstecz",
+    LANGUAGE = "Język",
+    SYSTEM = "Systemowy",
+    QUESTS_N = "Zadania: %d z %d",
+    ITEMS_N = "Przedmioty: %d z %d",
+    SUMMARY = "Porzucić zadań: %d, usunąć przedmiotów: %d",
+    NO_QUEST = "Bez zadania",
+    HINT = "Odznacz to, co chcesz zachować. Te przedmioty zostaną też następnym razem.",
+    NOTHING = "Nie ma czego czyścić.",
+    BAD_LEVEL = "Wpisz poziom od 1 do 99.",
+    IN_COMBAT = "Nie w walce.",
+    DONE = "Gotowe: porzucone zadania: %d, usunięte stosy: %d.",
+    LEFT = "Zostało: %d. Naciśnij OK jeszcze raz.",
+    WHY_ABANDONED = "do zadania, które porzucasz",
+    WHY_NO_QUEST = "żadne zadanie w dzienniku go nie potrzebuje",
+    WHY_DONE = "rozpoczyna już wykonane zadanie",
+    WHY_QUEST_STAYS = "zostaje: jego zadanie zostaje",
+    KEEP_RESET = "Lista zachowanych przedmiotów wyczyszczona.",
+    HELP = "/gqc otwiera okno, /gqc reset zapomina zachowane przedmioty.",
+}
+
+T.pt = {
+    LEVEL = "Abandonar missões de nível",
+    OR_LOWER = "ou menos",
+    YOUR_LEVEL = "Seu nível: %d",
+    DO_QUESTS = "Abandonar missões",
+    DO_ITEMS = "Apagar itens de missão que sobraram",
+    CLEAR = "Limpar",
+    OK = "OK",
+    BACK = "Voltar",
+    LANGUAGE = "Idioma",
+    SYSTEM = "Sistema",
+    QUESTS_N = "Missões: %d de %d",
+    ITEMS_N = "Itens: %d de %d",
+    SUMMARY = "Abandonar %d missões, apagar %d itens",
+    NO_QUEST = "Sem missão",
+    HINT = "Desmarque o que quiser manter. Esses itens também ficam da próxima vez.",
+    NOTHING = "Nada para limpar.",
+    BAD_LEVEL = "Digite um nível de 1 a 99.",
+    IN_COMBAT = "Não em combate.",
+    DONE = "Pronto: %d missões abandonadas, %d pilhas apagadas.",
+    LEFT = "Faltam %d. Pressione OK de novo.",
+    WHY_ABANDONED = "para uma missão que você abandona",
+    WHY_NO_QUEST = "nenhuma missão do registro precisa dele",
+    WHY_DONE = "inicia uma missão que você já fez",
+    WHY_QUEST_STAYS = "fica: a missão dele fica",
+    KEEP_RESET = "Lista de itens mantidos esvaziada.",
+    HELP = "/gqc abre a janela, /gqc reset esquece os itens mantidos.",
+}
+
+T.ru = {
+    LEVEL = "Бросить квесты уровня",
+    OR_LOWER = "и ниже",
+    YOUR_LEVEL = "Ваш уровень: %d",
+    DO_QUESTS = "Бросать квесты",
+    DO_ITEMS = "Удалять ненужные квестовые предметы",
+    CLEAR = "Очистить",
+    OK = "OK",
+    BACK = "Назад",
+    LANGUAGE = "Язык",
+    SYSTEM = "Системный",
+    QUESTS_N = "Квесты: %d из %d",
+    ITEMS_N = "Предметы: %d из %d",
+    SUMMARY = "Бросить квестов: %d, удалить предметов: %d",
+    NO_QUEST = "Без квеста",
+    HINT = "Снимите галочку с того, что нужно оставить. Такие предметы останутся и в следующий раз.",
+    NOTHING = "Чистить нечего.",
+    BAD_LEVEL = "Введите уровень от 1 до 99.",
+    IN_COMBAT = "Не в бою.",
+    DONE = "Готово: брошено квестов %d, удалено стопок предметов %d.",
+    LEFT = "Осталось %d. Нажмите OK ещё раз.",
+    WHY_ABANDONED = "для квеста, который бросаете",
+    WHY_NO_QUEST = "не нужен ни одному квесту в журнале",
+    WHY_DONE = "начинает уже сделанный квест",
+    WHY_QUEST_STAYS = "останется: его квест остаётся",
+    KEEP_RESET = "Список сохраняемых предметов очищен.",
+    HELP = "/gqc открывает окно, /gqc reset забывает сохраняемые предметы.",
+}
+
+T.zh = {
+    LEVEL = "放弃等级不高于",
+    OR_LOWER = "的任务",
+    YOUR_LEVEL = "你的等级：%d",
+    DO_QUESTS = "放弃任务",
+    DO_ITEMS = "删除多余的任务物品",
+    CLEAR = "清理",
+    OK = "确定",
+    BACK = "返回",
+    LANGUAGE = "语言",
+    SYSTEM = "跟随客户端",
+    QUESTS_N = "任务：%d / %d",
+    ITEMS_N = "物品：%d / %d",
+    SUMMARY = "放弃 %d 个任务，删除 %d 个物品",
+    NO_QUEST = "无任务",
+    HINT = "取消勾选想保留的内容。取消勾选的物品下次也会保留。",
+    NOTHING = "没有需要清理的。",
+    BAD_LEVEL = "请输入 1 到 99 的等级。",
+    IN_COMBAT = "战斗中无法使用。",
+    DONE = "完成：放弃了 %d 个任务，删除了 %d 组物品。",
+    LEFT = "还剩 %d 项。请再按一次确定。",
+    WHY_ABANDONED = "属于你要放弃的任务",
+    WHY_NO_QUEST = "任务日志中没有任务需要它",
+    WHY_DONE = "开启一个已完成的任务",
+    WHY_QUEST_STAYS = "保留：它的任务仍在",
+    KEEP_RESET = "已清空保留物品列表。",
+    HELP = "/gqc 打开窗口，/gqc reset 清空保留物品列表。",
+}
+
+ns.T = T
+ns.lang = CLIENT[GetLocale()] or "en"
+
+ns.L = setmetatable({}, { __index = function(_, key)
+    local t = T[ns.lang]
+    return (t and t[key]) or T.en[key] or key
+end })
+
+-- Tag "" follows the game client; any other tag is one of TAGS.
+function ns.SetLanguage(tag)
+    ns.lang = (tag and tag ~= "" and T[tag] and tag) or CLIENT[GetLocale()] or "en"
 end
 
-ns.L = L
+function ns.LanguageName(tag)
+    for i, t in ipairs(ns.TAGS) do
+        if t == (tag or "") then return ns.NAMES[i] or ns.L.SYSTEM end
+    end
+    return ns.L.SYSTEM
+end

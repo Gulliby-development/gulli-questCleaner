@@ -2,6 +2,13 @@
 ## Title: |cff9ad0ffGulli|r-QuestCleaner
 ## Notes: Abandon low-level quests and delete leftover quest items from your bags. Shows a list before anything is removed. /gqc
 ## Notes-ruRU: Бросает квесты низкого уровня и удаляет из сумок ненужные квестовые предметы. Перед удалением показывает список. /gqc
+## Notes-deDE: Bricht Quests niedriger Stufe ab und löscht übrige Questgegenstände aus den Taschen. Zeigt vorher eine Liste. /gqc
+## Notes-esES: Abandona misiones de nivel bajo y borra de las bolsas los objetos de misión sobrantes. Antes muestra una lista. /gqc
+## Notes-esMX: Abandona misiones de nivel bajo y borra de las bolsas los objetos de misión sobrantes. Antes muestra una lista. /gqc
+## Notes-frFR: Abandonne les quêtes de bas niveau et supprime des sacs les objets de quête restants. Affiche d'abord une liste. /gqc
+## Notes-ptBR: Abandona missões de nível baixo e apaga das bolsas os itens de missão que sobraram. Mostra uma lista antes. /gqc
+## Notes-zhCN: 放弃低等级任务并删除背包中多余的任务物品。删除前先显示列表。/gqc
+## Notes-zhTW: 放弃低等级任务并删除背包中多余的任务物品。删除前先显示列表。/gqc
 ## Author: Gulliby
 ## Version: 1.0.0
 ## IconTexture: Interface\Icons\INV_Misc_Bag_08

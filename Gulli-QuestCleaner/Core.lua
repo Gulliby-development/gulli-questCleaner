@@ -224,14 +224,14 @@ function ns.PlanItems(planned)
             it.links = {}
             if it.starts then
                 if questDone(it.starts) then
-                    it.why = L.WHY_DONE
+                    it.why = "WHY_DONE"
                     out[#out + 1] = it
                 end
             elseif not needed(it, keepBlob, keepIds) then
                 for _, q in ipairs(planned or {}) do
                     if needed(it, q.blob, q.ids) then it.links[#it.links + 1] = q end
                 end
-                it.why = #it.links > 0 and L.WHY_ABANDONED or L.WHY_NO_QUEST
+                it.why = #it.links > 0 and "WHY_ABANDONED" or "WHY_NO_QUEST"
                 out[#out + 1] = it
             end
             it.checked = true
@@ -339,6 +339,7 @@ f:SetScript("OnEvent", function(_, _, name)
     local d = db()
     if d.quests == nil then d.quests = true end
     if d.items == nil then d.items = true end
+    ns.SetLanguage(d.lang)
 end)
 
 SLASH_GULLIQUESTCLEANER1 = "/gqc"

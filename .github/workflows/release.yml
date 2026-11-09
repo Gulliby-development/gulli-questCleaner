@@ -2,6 +2,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -13,20 +14,21 @@ jobs:
         run: |
           sudo apt-get install -y lua5.1 >/dev/null
           for f in Gulli-QuestCleaner/*.lua; do luac5.1 -p "$f"; done
-      - name: Check version
+      - name: Read version
         run: |
-          v="${GITHUB_REF_NAME#v}"
-          grep -q "^## Version: $v$" Gulli-QuestCleaner/Gulli-QuestCleaner.toc || { echo "TOC version is not $v"; exit 1; }
+          v=$(sed -n 's/^## Version: *//p' Gulli-QuestCleaner/Gulli-QuestCleaner.toc | tr -d '\r')
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match TOC version $v"; exit 1
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
       - name: Package
         run: |
-          v="${GITHUB_REF_NAME#v}"
-          zip -r "Gulli-QuestCleaner-$v-forever.zip" Gulli-QuestCleaner
-          cat > release.json <<JSON
-          {"releases":[{"name":"Gulli-QuestCleaner","version":"$v","filename":"Gulli-QuestCleaner-$v-forever.zip","nolib":false,"metadata":[{"flavor":"forever","interface":16001}]}]}
-          JSON
+          zip -r "Gulli-QuestCleaner-$VERSION-forever.zip" Gulli-QuestCleaner
+          printf '{"releases":[{"name":"Gulli-QuestCleaner","version":"%s","filename":"Gulli-QuestCleaner-%s-forever.zip","nolib":false,"metadata":[{"flavor":"forever","interface":16001}]}]}\n' "$VERSION" "$VERSION" > release.json
+          cat release.json
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          v="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" "Gulli-QuestCleaner-$v-forever.zip" release.json --title "Gulli-QuestCleaner $v" --generate-notes
+          gh release create "v$VERSION" "Gulli-QuestCleaner-$VERSION-forever.zip" release.json \
+            --target "$GITHUB_SHA" --title "Gulli-QuestCleaner $VERSION" --generate-notes

@@ -13,13 +13,20 @@ local GREY = "|cff9d9d9d"
 
 local frame, setup, preview, status, summary
 local edit, checkQuests, checkItems
-local scroll, content, okButton, backButton, questHead, itemHead
+local scroll, content, okButton, backButton, questHead, itemHead, langButton, langMenu
 local plan = { quests = {}, items = {} }
 local totals = { quests = 0, items = 0 }
 local pools = { quest = {}, item = {}, label = {}, line = {}, band = {} }
 local used = {}
 
 local function setStatus(text) status:SetText(text or "") end
+
+-- Fixed labels, set again when the player picks another language.
+local labels = {}
+local function say(obj, key)
+    labels[#labels + 1] = { obj, key }
+    obj:SetText(L[key])
+end
 
 ---- Pools ---------------------------------------------------------------------
 
@@ -161,7 +168,7 @@ local function placeItem(it, y, rightX, width)
     r.check:SetEnabled(not blocked)
     r.icon:SetTexture(it.icon)
     r.text:SetText((it.link or it.name) .. (it.count > 1 and (GREY .. " x" .. it.count .. "|r") or ""))
-    r.sub:SetText(blocked and L.WHY_QUEST_STAYS or it.why or "")
+    r.sub:SetText(L[blocked and "WHY_QUEST_STAYS" or it.why])
     r:SetAlpha(ns.ItemGoes(it) and 1 or 0.5)
     return r
 end
@@ -314,19 +321,19 @@ end
 
 ---- Build ---------------------------------------------------------------------
 
-local function button(parent, text, width)
+local function button(parent, key, width)
     local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     b:SetSize(width or 100, 30)
-    b:SetText(text)
+    say(b, key)
     return b
 end
 
-local function checkbox(parent, text)
+local function checkbox(parent, key)
     local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     c:SetSize(26, 26)
     local label = c:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     label:SetPoint("LEFT", c, "RIGHT", 2, 0)
-    label:SetText(text)
+    say(label, key)
     return c
 end
 
@@ -362,7 +369,7 @@ local function build()
 
     local label = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     label:SetPoint("TOPLEFT", 18, -42)
-    label:SetText(L.LEVEL)
+    say(label, "LEVEL")
     edit = CreateFrame("EditBox", nil, setup, "InputBoxTemplate")
     edit:SetSize(36, 24)
     edit:SetPoint("LEFT", label, "RIGHT", 10, 0)
@@ -374,18 +381,53 @@ local function build()
     edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     local after = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     after:SetPoint("LEFT", edit, "RIGHT", 6, 0)
-    after:SetText(L.OR_LOWER)
+    say(after, "OR_LOWER")
     setup.level = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     setup.level:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -8)
 
-    checkQuests = checkbox(setup, L.DO_QUESTS)
+    checkQuests = checkbox(setup, "DO_QUESTS")
     checkQuests:SetPoint("TOPLEFT", setup.level, "BOTTOMLEFT", -4, -10)
-    checkItems = checkbox(setup, L.DO_ITEMS)
+    checkItems = checkbox(setup, "DO_ITEMS")
     checkItems:SetPoint("TOPLEFT", checkQuests, "BOTTOMLEFT", 0, -2)
 
-    local clear = button(setup, L.CLEAR, 140)
+    local clear = button(setup, "CLEAR", 140)
     clear:SetPoint("BOTTOMRIGHT", -14, 12)
     clear:SetScript("OnClick", onClear)
+
+    -- Language: "System" follows the game client, like the Runeloader app.
+    local langLabel = setup:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    say(langLabel, "LANGUAGE")
+    langButton = button(setup, "SYSTEM", 130)
+    langButton:SetPoint("TOPRIGHT", -14, -36)
+    langLabel:SetPoint("RIGHT", langButton, "LEFT", -6, 0)
+    langMenu = CreateFrame("Frame", nil, frame)
+    langMenu:SetFrameStrata("FULLSCREEN_DIALOG")
+    langMenu:SetPoint("TOPRIGHT", langButton, "BOTTOMRIGHT", 0, -2)
+    langMenu:SetSize(130, #ns.TAGS * 26 + 8)
+    langMenu:EnableMouse(true)
+    local bg = langMenu:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.05, 0.05, 0.07, 0.96)
+    langMenu:Hide()
+    for i, tag in ipairs(ns.TAGS) do
+        local b = CreateFrame("Button", nil, langMenu)
+        b:SetSize(122, 26)
+        b:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 26)
+        hover(b)
+        local t = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        t:SetPoint("LEFT", 8, 0)
+        b.text = t
+        b.tag = tag
+        b:SetScript("OnClick", function()
+            ns.db().lang = tag
+            ns.SetLanguage(tag)
+            langMenu:Hide()
+            ns.ApplyTexts()
+        end)
+        langMenu[i] = b
+    end
+    langButton:SetScript("OnClick", function() langMenu:SetShown(not langMenu:IsShown()) end)
+    setup:SetScript("OnHide", function() langMenu:Hide() end)
 
     -- Preview view
     preview = CreateFrame("Frame", nil, frame)
@@ -408,17 +450,17 @@ local function build()
     hint:SetPoint("BOTTOMLEFT", 16, 54)
     hint:SetPoint("RIGHT", -16, 0)
     hint:SetJustifyH("LEFT")
-    hint:SetText(L.HINT)
+    say(hint, "HINT")
 
     summary = preview:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     summary:SetPoint("BOTTOMLEFT", 16, 36)
     summary:SetPoint("RIGHT", -290, 0)
     summary:SetJustifyH("LEFT")
 
-    okButton = button(preview, L.OK, 140)
+    okButton = button(preview, "OK", 140)
     okButton:SetPoint("BOTTOMRIGHT", -14, 12)
     okButton:SetScript("OnClick", onOK)
-    backButton = button(preview, L.BACK, 110)
+    backButton = button(preview, "BACK", 110)
     backButton:SetPoint("RIGHT", okButton, "LEFT", -8, 0)
     backButton:SetScript("OnClick", function()
         setStatus("")
@@ -426,6 +468,19 @@ local function build()
     end)
 
     frame:SetScript("OnShow", function() setStatus(""); showSetup() end)
+    ns.ApplyTexts()
+end
+
+function ns.ApplyTexts()
+    for _, e in ipairs(labels) do e[1]:SetText(L[e[2]]) end
+    local current = ns.db().lang or ""
+    langButton:SetText(ns.LanguageName(current))
+    for i, tag in ipairs(ns.TAGS) do
+        local b = langMenu[i]
+        b.text:SetText((tag == current and "|cffffd100" or "") .. ns.LanguageName(tag))
+    end
+    setup.level:SetText(GREY .. L.YOUR_LEVEL:format(UnitLevel("player")))
+    if preview:IsShown() then refresh() end
 end
 
 function ns.Toggle()
