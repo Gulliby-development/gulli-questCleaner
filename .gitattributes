@@ -1,0 +1,5 @@
+# LF everywhere, so the scripts and tests run the same on Windows, Linux and macOS.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.tga binary
