@@ -30,6 +30,8 @@ function Fake(spec)
     W.frames = {}
     W.printed = {}
     W.combat, W.refuseDelete, W.slowCursor = false, false, false
+    W.tags = spec.tags or {}
+    W.sold = {}
 
     C_QuestLog = {
         GetNumQuestLogEntries = function() return #W.quests end,
@@ -49,6 +51,8 @@ function Fake(spec)
         SetAbandonQuest = function() end,
         AbandonQuest = function() W.abandoned[W.selected] = true end,
         IsQuestFlaggedCompleted = function(id) return W.done[id] == true end,
+        GetQuestTagInfo = function(id) return W.tags[id] end,
+        GetMaxNumQuestsCanAccept = function() return spec.maxQuests or 20 end,
     }
     GetQuestLogQuestText = function(i)
         local q = W.quests[i]
@@ -73,12 +77,21 @@ function Fake(spec)
             return { isQuestItem = it and it.questItem or false, questID = it and it.starts }
         end,
         PickupContainerItem = function(b, s) W.cursor = s end,
+        UseContainerItem = function(b, s) W.sold[W.bag[s].name] = true; W.bag[s].gone = true end,
+        GetContainerNumFreeSlots = function(b) return b == 0 and (spec.free or 0) or 0 end,
     }
-    C_Item = { GetItemInfoInstant = function(id)
-        for _, it in ipairs(W.bag) do
-            if it.id == id then return id, nil, nil, nil, nil, it.class end
-        end
-    end }
+    C_Item = {
+        GetItemInfoInstant = function(id)
+            for _, it in ipairs(W.bag) do
+                if it.id == id then return id, nil, nil, nil, nil, it.class end
+            end
+        end,
+        GetItemInfo = function(id)
+            for _, it in ipairs(W.bag) do
+                if it.id == id then return it.name, nil, nil, nil, nil, nil, nil, nil, nil, nil, it.price or 0 end
+            end
+        end,
+    }
     GetCursorInfo = function() if W.cursor then return "item", W.bag[W.cursor].id end end
     ClearCursor = function() W.cursor = nil end
     DeleteCursorItem = function()
@@ -95,13 +108,18 @@ function Fake(spec)
     UIParent, GameTooltip, UISpecialFrames = stub(), stub(), {}
     tinsert = table.insert
     UnitLevel = function() return spec.level or 40 end
-    UnitClass = function() return "Mage", "MAGE" end
+    UnitClass = function() return "Mage", "MAGE", 8 end
+    UnitRace = function() return "Human", "Human", spec.race or 1 end
+    UnitQuestTrivialLevelRange = spec.greenRange and function() return spec.greenRange end or nil
+    GetQuestGreenRange = nil
+    time = function() return 1000 end
     RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } }
     STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
     GetQuestDifficultyColor = function() return { r = 1, g = 0.5, b = 0 } end
     C_Timer = { After = function(_, f) f() end }
     print = function(...) W.printed[#W.printed + 1] = table.concat({ ... }, " ") end
     GulliQuestCleanerDB = spec.db
+    GulliQuestCleanerCharDB = spec.charDB
     return W
 end
 
@@ -117,6 +135,14 @@ function Load(dir)
         if onEvent then onEvent(f, "ADDON_LOADED", "Gulli-QuestCleaner") end
     end
     return ns
+end
+
+-- Sends a game event to every frame that listens.
+function Fire(event, ...)
+    for _, f in ipairs(W.frames) do
+        local onEvent = rawget(f, "_OnEvent")
+        if onEvent then onEvent(f, event, ...) end
+    end
 end
 
 -- The text shown on a widget: its own, or that of its label (flat buttons keep it there).

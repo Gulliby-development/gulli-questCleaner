@@ -10,14 +10,16 @@
 ## Notes-zhCN: 放弃低等级任务并删除背包中多余的任务物品。删除前先显示列表。/gqc
 ## Notes-zhTW: 放弃低等级任务并删除背包中多余的任务物品。删除前先显示列表。/gqc
 ## Author: Gulliby
-## Version: 1.1.1
+## Version: 1.2.0
 ## IconTexture: Interface\AddOns\Gulli-QuestCleaner\icon
 ## SavedVariables: GulliQuestCleanerDB
+## SavedVariablesPerCharacter: GulliQuestCleanerCharDB
 ## AddonCompartmentFunc: GulliQuestCleaner_Toggle
 ## Category: Quests
-## X-License: MIT
+## X-License: GPL-3.0
 
 Locales.lua
+Data.lua
 Core.lua
 Skin.lua
 UI.lua
