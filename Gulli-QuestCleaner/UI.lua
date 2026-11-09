@@ -322,15 +322,17 @@ local function onOK()
     for _, it in ipairs(plan.items) do
         if not it.checked then keep[it.itemID] = true end
     end
-    local a, d = ns.Run(plan.quests, plan.items)
-    totals.quests = totals.quests + a
-    totals.items = totals.items + d
+    local beforeQ, beforeI = ns.Leftover(plan.quests, plan.items)
+    ns.Run(plan.quests, plan.items)
     okButton:Disable()
     backButton:Disable()
-    -- Abandons and deletes land a moment later; then see what the game refused.
+    -- Abandons and deletes land a moment later; then count what really went and show
+    -- what the game refused.
     C_Timer.After(1, function()
         backButton:Enable()
         local q, i = ns.Leftover(plan.quests, plan.items)
+        totals.quests = totals.quests + #beforeQ - #q
+        totals.items = totals.items + #beforeI - #i
         if #q + #i == 0 then
             local done = L.DONE:format(totals.quests, totals.items)
             ns.Print(done)

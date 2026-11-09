@@ -26,7 +26,7 @@ Gulli-QuestCleaner is a World of Warcraft addon for WoW Forever. It abandons the
   - `ns.ItemGoes`: an item goes only when it is ticked and every quest it is linked to goes too.
 - `Skin.lua` is the flat look in the spirit of ElvUI: dark panels with 1 pixel borders, the class colour as the accent, flat buttons, check boxes, edit boxes and a thin scroll bar, all drawn from plain textures.
 - `UI.lua` is the window: the setup view (level, what to clean) and the preview (zones with their quests on the left, items on the right, a line from each quest to its items; a zone row ticks or unticks all its quests). It shows what `Core.lua` planned and never decides on its own what to remove.
-- Removing things runs inside the **OK** click, because the game lets an addon delete a picked-up item only inside a hardware event. `ns.Run` stops at the first refused delete; a second later `ns.Leftover` shows what is still there, and the player presses **OK** again.
+- Removing things runs inside the **OK** click, because the game lets an addon delete a picked-up item only inside a hardware event. The game confirms a delete later, so the cursor can still hold the item right after `DeleteCursorItem`: `ns.Run` never stops on that, it clears the cursor and goes on, so one **OK** tries every ticked item. A second later `ns.Leftover` shows what the game really refused, and the player presses **OK** again only for that.
 
 ## Task workflow
 

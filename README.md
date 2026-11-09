@@ -66,7 +66,7 @@ After a few zones, your quest log is full of grey quests, and your bags are full
 <details>
 <summary><b>It says "Press OK again"</b></summary>
 
-The game lets an addon delete only a few things per click. Press **OK** again until the list is empty.
+The game refused to remove something, for example because the item was busy. The list shows what is left; press **OK** again.
 </details>
 
 <details>
