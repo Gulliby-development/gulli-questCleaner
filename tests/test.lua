@@ -82,7 +82,7 @@ test("OK abandons ticked quests and deletes ticked items only", function()
     for _, it in ipairs(items) do if it.name == "Old Note" then it.checked = false end end
     local a, d = ns.Run(quests, items)
     eq(a, 2, "abandoned")
-    eq(d, 2, "deleted")
+    eq(d, 2, "delete tries")
     eq(w.abandoned[101] and w.abandoned[102] and not w.abandoned[103], true, "abandoned the right quests")
     for _, it in ipairs(w.bag) do
         local gone = it.name == "Wolf Pelt" or it.name == "Sealed Letter"
@@ -90,17 +90,28 @@ test("OK abandons ticked quests and deletes ticked items only", function()
     end
 end)
 
-test("a refused delete stops the run and is offered again", function()
+test("a refused delete leaves the item to be offered again", function()
     local w = Fake { quests = QUESTS, bag = bag() }
     local ns = Load()
     local quests = ns.PlanQuests(10)
     local items = ns.PlanItems(quests)
     w.refuseDelete = true
-    local _, d = ns.Run(quests, items)
-    eq(d, 0, "deleted")
+    ns.Run(quests, items)
     eq(w.cursor, nil, "cursor cleared")
     local _, left = ns.Leftover(quests, items)
     eq(#left, #items, "items left")
+end)
+
+test("one OK deletes every ticked item even when the cursor clears late", function()
+    local w = Fake { quests = QUESTS, bag = bag(), done = { [55] = true } }
+    local ns = Load()
+    local quests = ns.PlanQuests(10)
+    local items = ns.PlanItems(quests)
+    w.slowCursor = true
+    ns.Run(quests, items)
+    local _, left = ns.Leftover(quests, items)
+    eq(#left, 0, "items left after one OK")
+    eq(w.cursor, nil, "cursor cleared")
 end)
 
 test("nothing happens in combat", function()

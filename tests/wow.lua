@@ -29,7 +29,7 @@ function Fake(spec)
     W.cursor = nil
     W.frames = {}
     W.printed = {}
-    W.combat, W.refuseDelete = false, false
+    W.combat, W.refuseDelete, W.slowCursor = false, false, false
 
     C_QuestLog = {
         GetNumQuestLogEntries = function() return #W.quests end,
@@ -84,7 +84,8 @@ function Fake(spec)
     DeleteCursorItem = function()
         if W.refuseDelete then return end
         W.bag[W.cursor].gone = true
-        W.cursor = nil
+        -- The real client confirms a delete later; until then the cursor may still show it.
+        if not W.slowCursor then W.cursor = nil end
     end
     InCombatLockdown = function() return W.combat == true end
     GetLocale = function() return spec.locale or "enUS" end

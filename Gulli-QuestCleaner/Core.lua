@@ -302,8 +302,10 @@ local function pickup(bag, slot)
 end
 
 -- Runs from the OK click: the game lets an addon delete a picked-up item only
--- inside a hardware event. Returns quests abandoned and stacks deleted; whatever
--- the game refused stays and is offered again.
+-- inside a hardware event. The game confirms a delete later, so the cursor can still
+-- show the item right after DeleteCursorItem: never stop the run on that, clear the
+-- cursor and go on to the next item. ns.Leftover tells afterwards what really went.
+-- Returns the quests and the item stacks it tried.
 function ns.Run(quests, items)
     if InCombatLockdown() then
         ns.Print(L.IN_COMBAT)
@@ -322,16 +324,11 @@ function ns.Run(quests, items)
             local id, _, _, locked = slotInfo(it.bag, it.slot)
             if id == it.itemID and not locked then
                 pickup(it.bag, it.slot)
-                if cursorItemID() ~= it.itemID then
-                    ClearCursor()
-                    break
+                if cursorItemID() == it.itemID then
+                    DeleteCursorItem()
+                    deleted = deleted + 1
                 end
-                DeleteCursorItem()
-                if GetCursorInfo() then
-                    ClearCursor()
-                    break
-                end
-                deleted = deleted + 1
+                if GetCursorInfo() then ClearCursor() end
             end
         end
     end
