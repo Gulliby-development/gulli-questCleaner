@@ -14,16 +14,18 @@ Gulli-QuestCleaner is a World of Warcraft addon for WoW Forever. It abandons the
 
 ## How the addon works
 
-- `Gulli-QuestCleaner.toc` loads `Locales.lua`, `Core.lua`, `UI.lua` in this order and keeps `GulliQuestCleanerDB` as saved variables (`level`, `quests`, `items`, `lang`, `keep`).
-- `Locales.lua` has the texts of every language and picks one: `ns.L` reads the current language and falls back to English.
+- `Gulli-QuestCleaner.toc` loads `Locales.lua`, `Core.lua`, `Skin.lua`, `UI.lua` in this order and keeps `GulliQuestCleanerDB` as saved variables (`level`, `quests`, `items`, `keep`). The tests load the files in the TOC order.
+- `Locales.lua` has the texts of every language: `ns.L` reads the game client's language and falls back to English.
 - `Core.lua` holds the rules and touches the game: the quest log scan (`ns.Quests`), the plan (`ns.PlanQuests`, `ns.PlanItems`, `ns.ItemGoes`), the run (`ns.Run`, `ns.Leftover`), the slash commands and the saved variables.
   - A quest is planned when its level is at or below the entered level. Headers, hidden quests and quests without a level stay.
+  - Each quest keeps its zone: the quest log header above it. `ns.PlanQuests` sorts by zone in quest log order, then by level; `ns.Zones` groups the plan by zone for the window.
   - A bag item is a quest item when its class is Quest (12), the game marks it as a quest item, or it starts a quest.
   - A quest item is offered when no quest that stays in the log needs it. "Needs" means its name is in the quest's objectives, summary or description, or it is the quest's usable item. The planned quests that need it become its `links`; an item with no link is listed under "No quest".
   - An item that starts a quest is offered only when that quest is already done.
   - `PERMANENT` lists quest items that stay useful after their quest (dungeon keys, attunements, raid summoning items). They are never offered. Items the player unticked go into `keep` and are not offered again until `/gqc reset`.
   - `ns.ItemGoes`: an item goes only when it is ticked and every quest it is linked to goes too.
-- `UI.lua` is the window: the setup view (level, what to clean, language) and the preview (quests on the left, items on the right, a line from each quest to its items). It shows what `Core.lua` planned and never decides on its own what to remove.
+- `Skin.lua` is the flat look in the spirit of ElvUI: dark panels with 1 pixel borders, the class colour as the accent, flat buttons, check boxes, edit boxes and a thin scroll bar, all drawn from plain textures.
+- `UI.lua` is the window: the setup view (level, what to clean) and the preview (zones with their quests on the left, items on the right, a line from each quest to its items; a zone row ticks or unticks all its quests). It shows what `Core.lua` planned and never decides on its own what to remove.
 - Removing things runs inside the **OK** click, because the game lets an addon delete a picked-up item only inside a hardware event. `ns.Run` stops at the first refused delete; a second later `ns.Leftover` shows what is still there, and the player presses **OK** again.
 
 ## Task workflow
@@ -52,7 +54,7 @@ Gulli-QuestCleaner is a World of Warcraft addon for WoW Forever. It abandons the
 - A quest item that stays useful after its quest goes into `PERMANENT` in `Core.lua`, with its name in a comment.
 - A new rule for what gets offered goes into `Core.lua` (`PlanQuests`, `PlanItems` or `ItemGoes`) with a test in `tests/test.lua`. `UI.lua` only shows the plan.
 - The game API goes through the small wrappers in `Core.lua` (`slotInfo`, `numSlots`, `questInfo`, `pickup`, ...), which pick the `C_` function and fall back to the old global. A new game call gets such a wrapper and a fake in `tests/wow.lua`.
-- Build the UI in code with the game's templates (`BasicFrameTemplateWithInset`, `UIPanelButtonTemplate`, `UICheckButtonTemplate`, `InputBoxTemplate`, `UIPanelScrollFrameTemplate`). Do not add XML files.
+- Build the UI in code from the widgets in `Skin.lua` (`Box`, `Button`, `Check`, `Edit`, `Scroll`, `Text`), not from Blizzard's templates, so every part keeps the flat ElvUI-like look. A new kind of widget goes into `Skin.lua`. Do not add XML files.
 - The window must work by mouse and by touch on a phone or handheld: buttons at least 28 pixels high, check boxes at least 26, no text that runs out of its row.
 - Keep comments short and about intent that the code does not show.
 - Do not commit release zips or `release.json`; the Release workflow makes them.
@@ -75,9 +77,9 @@ The asset names and `release.json` are what Runeloader and its index read. A cha
 - `README.md` is the addon's page for players. It is in plain English (about B1 level): short sentences, no jargon in the main part. It keeps this order: the wordmark, a one-line pitch, features, install steps, FAQ. Technical details go inside `<details>` spoilers. Its images live in `docs/images/` and stay small (under about 400 KB each; use JPEG for large photo-like images).
 - The addon speaks the same languages as the Runeloader app: English (the base and the fallback), Deutsch, Español, Français, Polski, Português, Русский and 中文.
   - Put no UI text in `Core.lua` or `UI.lua`. Add every new key to every language table in `Locales.lua` in the same pull request; the test fails on a missing key or a different number of `%d`.
-  - By default the addon follows the game client's language (`GetLocale`), like the app follows the system language. The **Language** button picks another one, saved in `GulliQuestCleanerDB.lang`; **System** goes back to the client's language.
-  - A new language needs a table in `T`, an entry in `TAGS` and `NAMES` (named in itself), its client locales in `CLIENT` when the game has them, and a `## Notes-<locale>` line in the TOC.
-  - Save a text by its key (as `item.why` does), not as a translated string, so a language switch also changes it.
+  - The addon always follows the game client's language (`GetLocale`), like the app follows the system language. There is no language picker (owner's decision).
+  - A new language needs a table in `T`, an entry in `TAGS`, its client locales in `CLIENT` when the game has them, and a `## Notes-<locale>` line in the TOC.
+  - Save a text by its key (as `item.why` does), not as a translated string.
 
 ## Navigation
 

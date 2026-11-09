@@ -1,10 +1,8 @@
 local _, ns = ...
 
--- The same languages as the Runeloader app. The empty tag follows the game
--- client's language; English is the base and the fallback for a missing key.
-ns.TAGS = { "", "en", "de", "es", "fr", "pl", "pt", "ru", "zh" }
--- Each language by its own name, so a player finds theirs whatever the current one.
-ns.NAMES = { false, "English", "Deutsch", "Español", "Français", "Polski", "Português", "Русский", "中文" }
+-- The same languages as the Runeloader app. The addon always follows the game client's
+-- language; English is the base and the fallback for a missing key or another client.
+ns.TAGS = { "en", "de", "es", "fr", "pl", "pt", "ru", "zh" }
 
 local CLIENT = { enUS = "en", enGB = "en", deDE = "de", esES = "es", esMX = "es", frFR = "fr",
                  ptBR = "pt", ptPT = "pt", ruRU = "ru", zhCN = "zh", zhTW = "zh" }
@@ -20,8 +18,6 @@ T.en = {
     CLEAR = "Clear",
     OK = "OK",
     BACK = "Back",
-    LANGUAGE = "Language",
-    SYSTEM = "System",
     QUESTS_N = "Quests: %d of %d",
     ITEMS_N = "Items: %d of %d",
     SUMMARY = "Abandon %d quests, delete %d items",
@@ -49,8 +45,6 @@ T.de = {
     CLEAR = "Aufräumen",
     OK = "OK",
     BACK = "Zurück",
-    LANGUAGE = "Sprache",
-    SYSTEM = "System",
     QUESTS_N = "Quests: %d von %d",
     ITEMS_N = "Gegenstände: %d von %d",
     SUMMARY = "%d Quests abbrechen, %d Gegenstände löschen",
@@ -78,8 +72,6 @@ T.es = {
     CLEAR = "Limpiar",
     OK = "Aceptar",
     BACK = "Atrás",
-    LANGUAGE = "Idioma",
-    SYSTEM = "Sistema",
     QUESTS_N = "Misiones: %d de %d",
     ITEMS_N = "Objetos: %d de %d",
     SUMMARY = "Abandonar %d misiones, borrar %d objetos",
@@ -107,8 +99,6 @@ T.fr = {
     CLEAR = "Nettoyer",
     OK = "OK",
     BACK = "Retour",
-    LANGUAGE = "Langue",
-    SYSTEM = "Système",
     QUESTS_N = "Quêtes : %d sur %d",
     ITEMS_N = "Objets : %d sur %d",
     SUMMARY = "Abandonner %d quêtes, supprimer %d objets",
@@ -136,8 +126,6 @@ T.pl = {
     CLEAR = "Wyczyść",
     OK = "OK",
     BACK = "Wstecz",
-    LANGUAGE = "Język",
-    SYSTEM = "Systemowy",
     QUESTS_N = "Zadania: %d z %d",
     ITEMS_N = "Przedmioty: %d z %d",
     SUMMARY = "Porzucić zadań: %d, usunąć przedmiotów: %d",
@@ -165,8 +153,6 @@ T.pt = {
     CLEAR = "Limpar",
     OK = "OK",
     BACK = "Voltar",
-    LANGUAGE = "Idioma",
-    SYSTEM = "Sistema",
     QUESTS_N = "Missões: %d de %d",
     ITEMS_N = "Itens: %d de %d",
     SUMMARY = "Abandonar %d missões, apagar %d itens",
@@ -194,8 +180,6 @@ T.ru = {
     CLEAR = "Очистить",
     OK = "OK",
     BACK = "Назад",
-    LANGUAGE = "Язык",
-    SYSTEM = "Системный",
     QUESTS_N = "Квесты: %d из %d",
     ITEMS_N = "Предметы: %d из %d",
     SUMMARY = "Бросить квестов: %d, удалить предметов: %d",
@@ -223,8 +207,6 @@ T.zh = {
     CLEAR = "清理",
     OK = "确定",
     BACK = "返回",
-    LANGUAGE = "语言",
-    SYSTEM = "跟随客户端",
     QUESTS_N = "任务：%d / %d",
     ITEMS_N = "物品：%d / %d",
     SUMMARY = "放弃 %d 个任务，删除 %d 个物品",
@@ -250,15 +232,3 @@ ns.L = setmetatable({}, { __index = function(_, key)
     local t = T[ns.lang]
     return (t and t[key]) or T.en[key] or key
 end })
-
--- Tag "" follows the game client; any other tag is one of TAGS.
-function ns.SetLanguage(tag)
-    ns.lang = (tag and tag ~= "" and T[tag] and tag) or CLIENT[GetLocale()] or "en"
-end
-
-function ns.LanguageName(tag)
-    for i, t in ipairs(ns.TAGS) do
-        if t == (tag or "") then return ns.NAMES[i] or ns.L.SYSTEM end
-    end
-    return ns.L.SYSTEM
-end
